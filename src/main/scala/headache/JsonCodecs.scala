@@ -168,7 +168,7 @@ object JsonCodecs {
     (__ \ "private_channels").format[Array[Channel]] and
     (__ \ "guilds").format[Array[UnavailableGuild Either GatewayEvents.Guild]] and
     (__ \ "user_settings").format[Option[UserSettings]] and
-    (__ \ "read_state").format[Array[GatewayEvents.ReadState]] and
+    (__ \ "read_state").formatWithDefault[Array[GatewayEvents.ReadState]](Array.empty) and
     (__ \ "_trace").format[Array[String]]
   )(GatewayEvents.Ready.apply, unlift(GatewayEvents.Ready.unapply))
   
