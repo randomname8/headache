@@ -4,7 +4,7 @@ import enumeratum.values.{IntEnum, IntEnumEntry, StringEnum, StringEnumEntry}
 import java.time.Instant
 
 case class User(
-  id: String,
+  id: Snowflake,
   userName: String,
   discriminator: String,
   avatar: Option[String],
@@ -200,7 +200,7 @@ object PermissionOverwrite {
 
 case class Message(
   id: String,
-  channelId: String,
+  channelId: Snowflake,
   author: User,
   content: String,
   timestamp: Instant,
@@ -217,7 +217,7 @@ case class Message(
 )
 case class MessageUpdate(
   id: String,
-  channelId: String,
+  channelId: Snowflake,
   content: Option[String],
   editedTimestamp: Option[Instant],
   tts: Option[Boolean],

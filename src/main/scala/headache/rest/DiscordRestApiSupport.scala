@@ -11,7 +11,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
 import scala.util.control.{ControlThrowable, NoStackTrace}
-import Json4sUtils._, JsonCodecs._
+import JsonUtils._, JsonCodecs._
 
 private[headache] trait DiscordRestApiSupport {
 

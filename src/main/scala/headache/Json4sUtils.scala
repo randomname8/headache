@@ -8,7 +8,7 @@ import language.dynamics
 import scala.annotation.unchecked.uncheckedVariance
 import play.api.libs.json._
 
-object Json4sUtils {
+object JsonUtils {
 
   type Reads[+T] = play.api.libs.json.Reads[T @uncheckedVariance]
   type Writes[+T] = play.api.libs.json.Writes[T @uncheckedVariance]

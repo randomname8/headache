@@ -8,7 +8,7 @@ import play.api.libs.json.{Json, JsValue}
 import scala.concurrent._, duration._, ExecutionContext.Implicits._
 import scala.util.control.NoStackTrace
 import scala.util.control.NonFatal
-import Json4sUtils._
+import JsonUtils._
 
 private[headache] object VoiceConnectionSupport {
   val UdpKeepAlive = Array[Byte](0xC9.toByte, 0, 0, 0, 0, 0, 0, 0, 0)

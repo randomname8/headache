@@ -7,12 +7,12 @@ import java.util.Arrays
 import java.util.zip.{Inflater, InflaterOutputStream}
 import org.asynchttpclient.ws
 import org.json4s.native.JsonParser
-import play.api.libs.json.{Json, JsValue, JsNull, JsObject}
+import play.api.libs.json.{Json, JsValue, JsNull}
 import scala.annotation.tailrec
 import scala.concurrent._, duration._, ExecutionContext.Implicits._
 import scala.util.control.NoStackTrace
 import scala.util.control.NonFatal
-import Json4sUtils._
+import JsonUtils._
 
 private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
   import DiscordClient._
@@ -237,15 +237,15 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
                 })), Some("STATUS_UPDATE"))
         ))
     }
-    override def sendRequestGuildMembers(guildId: String, query: String = "", limit: Int = 0): Unit = {
+    override def sendRequestGuildMembers(guildId: Snowflake, query: String = "", limit: Int = 0): Unit = {
       send(renderJson(
-        gatewayMessage(GatewayOp.RequestGuildMembers, Json.obj("guild_id" -> guildId, "query" -> query, "limit" -> limit))
+        gatewayMessage(GatewayOp.RequestGuildMembers, Json.obj("guild_id" -> guildId.snowflakeString, "query" -> query, "limit" -> limit))
       ))
     }
-    override def sendVoiceStateUpdate(guildId: String, channelId: Option[String], selfMute: Boolean, selfDeaf: Boolean): Unit = {
+    override def sendVoiceStateUpdate(guildId: Snowflake, channelId: Option[Snowflake], selfMute: Boolean, selfDeaf: Boolean): Unit = {
       send(renderJson(
         gatewayMessage(GatewayOp.VoiceStateUpdate, Json.obj("guild_id" -> guildId, "self_mute" -> selfMute, "self_deaf" -> selfDeaf) ++
-                       channelId.fold(Json.obj())(c => Json.obj("channel_id" -> c)), Some("VOICE_STATE_UPDATE"))
+                       channelId.fold(Json.obj())(c => Json.obj("channel_id" -> c.snowflakeString)), Some("VOICE_STATE_UPDATE"))
       ))
     }
 

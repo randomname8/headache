@@ -3,7 +3,7 @@ package headache
 import org.asynchttpclient._
 import scala.concurrent._
 import play.api.libs.json.Json
-import Json4sUtils._
+import JsonUtils._
 
 object AhcUtils {
   /**

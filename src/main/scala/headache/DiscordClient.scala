@@ -5,7 +5,7 @@ import java.time.Instant
 import java.util.Arrays
 import org.asynchttpclient.{AsyncHttpClient, DefaultAsyncHttpClient, DefaultAsyncHttpClientConfig, ws}
 import scala.concurrent._, duration._, ExecutionContext.Implicits._
-import Json4sUtils._
+import JsonUtils._
 import AhcUtils._
 
 class DiscordClient(val token: String, val listener: DiscordClient.DiscordListener, val ahc: AsyncHttpClient = new DefaultAsyncHttpClient(
@@ -72,12 +72,12 @@ class DiscordClient(val token: String, val listener: DiscordClient.DiscordListen
     def totalShards: Int
 
     def sendStatusUpdate(idleSince: Option[Instant], status: Status): Unit
-    def sendVoiceStateUpdate(guildId: String, channelId: Option[String], selfMute: Boolean, selfDeaf: Boolean): Unit
-    def sendRequestGuildMembers(guildId: String, query: String = "", limit: Int = 0): Unit
+    def sendVoiceStateUpdate(guildId: Snowflake, channelId: Option[Snowflake], selfMute: Boolean, selfDeaf: Boolean): Unit
+    def sendRequestGuildMembers(guildId: Snowflake, query: String = "", limit: Int = 0): Unit
   }
 
   trait VoiceConnection extends Connection {
-    def guildId: String
+    def guildId: Snowflake
   }
 }
 object DiscordClient {
