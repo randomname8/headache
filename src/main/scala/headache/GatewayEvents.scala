@@ -106,14 +106,14 @@ object GatewayEvents {
   object GuildBanAdd {
     def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.GuildBanAdd) {
       val event = ge.payload()
-      Some(GuildBanAdd(event.d.guildId.extract, event.d.extract))
+      Some(GuildBanAdd(event.d.guild_id.extract, event.d.extract))
     } else None
   }
   case class GuildBanRemove(guildId: Snowflake, user: User)
   object GuildBanRemove {
     def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.GuildBanRemove) {
       val event = ge.payload()
-      Some(GuildBanRemove(event.d.guildId.extract, event.d.extract))
+      Some(GuildBanRemove(event.d.guild_id.extract, event.d.extract))
     } else None
   }
   case class GuildEmojisUpdate(guildId: Snowflake, emojis: Array[Emoji])
@@ -124,7 +124,7 @@ object GatewayEvents {
   object GuildMemberAddEvent {
     def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.GuildMemberAdd) {
       val event = ge.payload()
-      Some(GuildMemberAdd(event.d.guildId.extract, event.d.extract))
+      Some(GuildMemberAdd(event.d.guild_id.extract, event.d.extract))
     } else None
   }
   case class GuildMemberRemove(guildId: Snowflake, user: User)
@@ -178,7 +178,7 @@ object GatewayEvents {
   object VoiceStateUpdateEvent {
     def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.VoiceStateUpdate) {
       val event = ge.payload()
-      Some(VoiceStateUpdate(event.d.userId.extract, event.d.sessionId.extract, event.d.extract))
+      Some(VoiceStateUpdate(event.d.user_id.extract, event.d.session_id.extract, event.d.extract))
     } else None
   }
   case class VoiceServerUpdate(guildId: Snowflake, token: String, endpoint: String)
