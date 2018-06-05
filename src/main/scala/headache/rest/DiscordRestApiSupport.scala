@@ -23,7 +23,7 @@ private[headache] trait DiscordRestApiSupport {
   
   def optSnowflake(s: Snowflake) = if (s == NoSnowflake) None else Some(s)
   object channels extends Endpoint {
-    def baseRequest(channelId: String) = s"/channels/${channelId}"
+    def baseRequest(channelId: String) = s"https://discordapp.com/api/channels/${channelId}"
     
     def get(channelId: Snowflake)(implicit s: BackPressureStrategy): Future[Channel] = request(channelId.snowflakeString)(Json.parse(_).dyn.extract[Channel])
     def modify(channel: Channel)(implicit s: BackPressureStrategy): Future[Unit] = request(channel.id.snowflakeString, method = "PATCH", body = toJson(channel), expectedStatus = 201)(_ => ())
@@ -42,7 +42,7 @@ private[headache] trait DiscordRestApiSupport {
     
     def createMessage(channelId: Snowflake, message: String, embed: Embed = null, tts: Boolean = false)(implicit s: BackPressureStrategy): Future[Message] = {
       val body = Json.obj("content" -> message, "nonce" -> (null: String), "tts" -> tts, "embed" -> Option(embed))
-      request(channelId.snowflakeString, extraPath = "/messages", body = body)(Json.parse(_).dyn.extract[Message])
+      request(channelId.snowflakeString, extraPath = "/messages", method = "POST", body = body)(Json.parse(_).dyn.extract[Message])
     }
     
     //more to come
