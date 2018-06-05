@@ -244,8 +244,8 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
     }
     override def sendVoiceStateUpdate(guildId: Snowflake, channelId: Option[Snowflake], selfMute: Boolean, selfDeaf: Boolean): Unit = {
       send(renderJson(
-        gatewayMessage(GatewayOp.VoiceStateUpdate, Json.obj("guild_id" -> guildId, "self_mute" -> selfMute, "self_deaf" -> selfDeaf) ++
-                       channelId.fold(Json.obj())(c => Json.obj("channel_id" -> c.snowflakeString)), Some("VOICE_STATE_UPDATE"))
+          gatewayMessage(GatewayOp.VoiceStateUpdate, Json.obj("guild_id" -> guildId.snowflakeString, "self_mute" -> selfMute, "self_deaf" -> selfDeaf,
+                                                              "channel_id" -> channelId.map(_.snowflakeString)), Some("VOICE_STATE_UPDATE"))
       ))
     }
 
