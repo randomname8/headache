@@ -84,7 +84,7 @@ private[headache] trait VoiceConnectionSupport { self: DiscordClient =>
       })
       def voiceConnected(ssrc: Int, socket: DatagramSocket) = state(payload => {
         case VoiceOp.SessionDescription =>
-          val secret = payload.secret_key.extract[Seq[Byte]].to[Array]
+          val secret = payload.secret_key.extract[Array[Int]].map(_.toByte)
 
           /**
            * **************************************
