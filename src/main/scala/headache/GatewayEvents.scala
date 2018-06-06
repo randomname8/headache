@@ -32,6 +32,9 @@ object GatewayEvents {
     case object MessageUpdate extends EventType("MESSAGE_UPDATE")
     case object MessageDelete extends EventType("MESSAGE_DELETE")
     case object MessageDeleteBulk extends EventType("MESSAGE_DELETE_BULK")
+    case object MessageReactionAdd extends EventType("MESSAGE_REACTION_ADD")
+    case object MessageReactionRemove extends EventType("MESSAGE_REACTION_REMOVE")
+    case object MessageReactionRemoveAll extends EventType("MESSAGE_REACTION_REMOVE_ALL")
     case object PresenceUpdate extends EventType("PRESENCE_UPDATE")
     case object TypingStart extends EventType("TYPING_START")
     case object UserUpdate extends EventType("USER_UPDATE")
@@ -59,11 +62,11 @@ object GatewayEvents {
   case object Resumed { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.Resumed) Some(()) else None }
 
   case class ChannelCreate(channel: Channel)
-  object ChannelCreate { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.ChannelCreate) Some(ChannelCreate(ge.payload().d.extract)) else None }
+  object ChannelCreateEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.ChannelCreate) Some(ChannelCreate(ge.payload().d.extract)) else None }
   case class ChannelUpdate(channel: Channel)
-  object ChannelUpdate { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.ChannelUpdate) Some(ChannelUpdate(ge.payload().d.extract)) else None }
+  object ChannelUpdateEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.ChannelUpdate) Some(ChannelUpdate(ge.payload().d.extract)) else None }
   case class ChannelDelete(channel: Channel)
-  object ChannelDelete { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.ChannelDelete) Some(ChannelDelete(ge.payload().d.extract)) else None }
+  object ChannelDeleteEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.ChannelDelete) Some(ChannelDelete(ge.payload().d.extract)) else None }
 
   case class Guild(
     id: Snowflake,
@@ -97,20 +100,20 @@ object GatewayEvents {
   ) extends GuildDef
 
   case class GuildCreate(guild: Guild)
-  object GuildCreate { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.GuildCreate) Some(GuildCreate(ge.payload().d.extract)) else None }
+  object GuildCreateEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.GuildCreate) Some(GuildCreate(ge.payload().d.extract)) else None }
   case class GuildUpdate(guild: Guild)
-  object GuildUpdate { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.GuildUpdate) Some(GuildUpdate(ge.payload().d.extract)) else None }
+  object GuildUpdateEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.GuildUpdate) Some(GuildUpdate(ge.payload().d.extract)) else None }
   case class GuildDelete(guild: UnavailableGuild)
-  object GuildDelete { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.GuildDelete) Some(GuildDelete(ge.payload().d.extract)) else None }
+  object GuildDeleteEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.GuildDelete) Some(GuildDelete(ge.payload().d.extract)) else None }
   case class GuildBanAdd(guildId: Snowflake, user: User)
-  object GuildBanAdd {
+  object GuildBanAddEvent {
     def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.GuildBanAdd) {
       val event = ge.payload()
       Some(GuildBanAdd(event.d.guild_id.extract, event.d.extract))
     } else None
   }
   case class GuildBanRemove(guildId: Snowflake, user: User)
-  object GuildBanRemove {
+  object GuildBanRemoveEvent {
     def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.GuildBanRemove) {
       val event = ge.payload()
       Some(GuildBanRemove(event.d.guild_id.extract, event.d.extract))
@@ -129,7 +132,7 @@ object GatewayEvents {
   }
   case class GuildMemberRemove(guildId: Snowflake, user: User)
   object GuildMemberRemoveEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.GuildMemberRemove) Some(ge.payload().d.extract[GuildMemberRemove]) else None }
-  case class GuildMemberUpdate(guildId: Snowflake, user: User, roles: Array[Role])
+  case class GuildMemberUpdate(guildId: Snowflake, user: User, roles: Array[Snowflake], nick: Option[String])
   object GuildMemberUpdateEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.GuildMemberUpdate) Some(ge.payload().d.extract[GuildMemberUpdate]) else None }
   case class GuildMemberChunk(guildId: Snowflake, members: Array[GuildMember])
   object GuildMemberChunkEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.GuildMemberChunk) Some(ge.payload().d.extract[GuildMemberChunk]) else None }
@@ -148,11 +151,18 @@ object GatewayEvents {
   object MessageDeleteEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.MessageDelete) Some(ge.payload().d.extract[MessageDelete]) else None }
   case class MessageDeleteBulk(channelId: Snowflake, ids: Array[String])
   object MessageDeleteBulkEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.MessageDeleteBulk) Some(ge.payload().d.extract[MessageDeleteBulk]) else None }
+  
+  case class EmojiReference(id: Option[Snowflake], name: String)
+  case class MessageReaction(userId: Snowflake, channelId: Snowflake, messageId: Snowflake, emoji: EmojiReference)
+  object MessageReactionAddEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.MessageReactionAdd) Some(ge.payload().d.extract[MessageReaction]) else None }
+  object MessageReactionRemoveEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.MessageReactionRemove) Some(ge.payload().d.extract[MessageReaction]) else None }
+  case class MessageReactionRemoveAll(channelId: Snowflake, messageId: Snowflake)
+  object MessageReactionRemoveAllEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.MessageReactionRemoveAll) Some(ge.payload().d.extract[MessageReactionRemoveAll]) else None }
 
   case class PresenceUpdate(
     guildId: Snowflake,
     user: PresenceUser,
-    nick: String,
+    nick: Option[String] = None,
     roles: Array[Snowflake] = Array.empty,
     game: Option[GameStatus] = None,
     status: String

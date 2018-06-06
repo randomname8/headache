@@ -182,6 +182,9 @@ object JsonCodecs {
   implicit val guildRoleDeleteFormat: Format[GatewayEvents.GuildRoleDelete] = Json.format
   implicit val messageDeleteFormat: Format[GatewayEvents.MessageDelete] = Json.format
   implicit val messageDeleteBulkFormat: Format[GatewayEvents.MessageDeleteBulk] = Json.format
+  implicit val emojiReferenceFormat: Format[GatewayEvents.EmojiReference] = Json.format
+  implicit val messageReactionFormat: Format[GatewayEvents.MessageReaction] = Json.format
+  implicit val messageReactionRemoveAllFormat: Format[GatewayEvents.MessageReactionRemoveAll] = Json.format
   implicit val presenceUserFormat: Format[GatewayEvents.PresenceUser] = Json.format
   implicit val presenceUpdateFormat: Format[GatewayEvents.PresenceUpdate] = Json.format
   implicit val typingStartFormat: Format[GatewayEvents.TypingStart] = Json.format
