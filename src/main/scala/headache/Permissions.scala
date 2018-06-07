@@ -1,6 +1,7 @@
 package headache
 
 import enumeratum.values.{LongEnum, LongEnumEntry}
+import scala.annotation.varargs
 
 sealed abstract class Permission(val value: Long) extends LongEnumEntry
 object Permissions extends LongEnum[Permission] {
@@ -34,6 +35,36 @@ object Permissions extends LongEnum[Permission] {
   object ManageWebhooks      extends Permission(0x20000000l)
   object ManageEmojis        extends Permission(0x40000000l)
   
+  val createInstantInvite = CreateInstantInvite 
+  val kickMembers         = KickMembers         
+  val banMembers          = BanMembers          
+  val administrator       = Administrator       
+  val manageChannels      = ManageChannels      
+  val manageGuilds        = ManageGuilds        
+  val addReactions        = AddReactions        
+  val viewAuditLogs       = ViewAuditLogs       
+  val viewChannels        = ViewChannels        
+  val sendMessages        = SendMessages        
+  val sendTtsMessages     = SendTtsMessages     
+  val manageMessages      = ManageMessages      
+  val embedLinks          = EmbedLinks          
+  val attachFiles         = AttachFiles         
+  val readMessageHistory  = ReadMessageHistory  
+  val mentionEveryone     = MentionEveryone     
+  val useExternalEmojis   = UseExternalEmojis   
+  val connect             = Connect             
+  val speak               = Speak               
+  val muteMembers         = MuteMembers         
+  val deafenMembers       = DeafenMembers       
+  val moveMembers         = MoveMembers         
+  val useVad              = UseVad              
+  val changeNickname      = ChangeNickname      
+  val manageNicknames     = ManageNicknames     
+  val manageRoles         = ManageRoles         
+  val manageWebhooks      = ManageWebhooks      
+  val manageEmojis        = ManageEmojis        
+  
   
   def from(permissions: Long): Seq[Permission] = values.filter(p => (permissions & p.value) == p.value)
+  @varargs def compact(permissions: Permission*): Long = permissions.foldLeft(0l)(_ | _.value)
 }
