@@ -13,7 +13,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play-json" % "2.6.7",
   "org.json4s" %% "json4s-native" % "3.5.2",
   "org.scala-stm" %% "scala-stm" % "0.8",
-  "org.slf4j" % "slf4j-simple" % "1.7.25",
+  "org.slf4j" % "slf4j-simple" % "1.7.25" % "runtime",
   "com.google.code.findbugs" % "jsr305" % "3.0.2",
   "org.scalatest" %% "scalatest" % "3.0.5" % "test",
   "org.openjdk.jol" % "jol-core" % "0.9" % "test",

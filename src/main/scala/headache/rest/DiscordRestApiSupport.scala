@@ -22,13 +22,14 @@ private[headache] trait DiscordRestApiSupport {
   
   @volatile var maxQueuedRequests: Int = 100
   
-  def optSnowflake(s: Snowflake) = if (s == NoSnowflake) None else Some(s)
+  private def optSnowflake(s: Snowflake) = if (s == NoSnowflake) None else Some(s)
+  private val unit: String => Unit = _ => ()
   object channels extends Endpoint {
     def baseRequest(channelId: String) = s"https://discordapp.com/api/channels/${channelId}"
     
     def get(channelId: Snowflake)(implicit s: BackPressureStrategy): Future[Channel] = request(channelId.snowflakeString)(Json.parse(_).dyn.extract[Channel])
-    def modify(channel: Channel)(implicit s: BackPressureStrategy): Future[Unit] = request(channel.id.snowflakeString, method = "PATCH", body = toJson(channel), expectedStatus = 201)(_ => ())
-    def delete(channelId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] = request(channelId.snowflakeString, method = "DELETE")(_ => ())
+    def modify(channel: Channel)(implicit s: BackPressureStrategy): Future[Unit] = request(channel.id.snowflakeString, method = "PATCH", body = toJson(channel), expectedStatus = 201)(unit)
+    def delete(channelId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] = request(channelId.snowflakeString, method = "DELETE")(unit)
     
     def getMessage(channelId: Snowflake, messageId: Snowflake)(implicit s: BackPressureStrategy): Future[Message] = 
       request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}")(Json.parse(_).dyn.extract[Message])
@@ -52,17 +53,17 @@ private[headache] trait DiscordRestApiSupport {
       request(channelId.snowflakeString, extraPath = "/messages", method = "PATCH", body = body)(Json.parse(_).dyn.extract[Message])
     }
     def deleteMessage(channelId: Snowflake, messageId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
-      request(channelId.snowflakeString, extraPath = "/messages", method = "DELETE", expectedStatus = 204)(_ => ())
+      request(channelId.snowflakeString, extraPath = "/messages", method = "DELETE", expectedStatus = 204)(unit)
     def bulkDeleteMessages(channelId: Snowflake, messageIds: Array[Snowflake])(implicit s: BackPressureStrategy): Future[Unit] =
-      request(channelId.snowflakeString, extraPath = "/messages/bulk-delete", method = "POST", body = Json.toJson(messageIds), expectedStatus = 204)(_ => ())
+      request(channelId.snowflakeString, extraPath = "/messages/bulk-delete", method = "POST", body = Json.toJson(messageIds), expectedStatus = 204)(unit)
     
     
     def createReaction(channelId: Snowflake, messageId: Snowflake, emoji: String)(implicit s: BackPressureStrategy): Future[Unit] = 
-      request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}/reactions/$emoji/@me", method = "PUT", expectedStatus = 204)(_ => ())
+      request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}/reactions/$emoji/@me", method = "PUT", expectedStatus = 204)(unit)
     def deleteOwnReaction(channelId: Snowflake, messageId: Snowflake, emoji: String)(implicit s: BackPressureStrategy): Future[Unit] = 
-      request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}/reactions/$emoji/@me", method = "DELETE", expectedStatus = 204)(_ => ())
+      request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}/reactions/$emoji/@me", method = "DELETE", expectedStatus = 204)(unit)
     def deleteUserReaction(channelId: Snowflake, messageId: Snowflake, emoji: String, userId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] = 
-      request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}/reactions/$emoji/@{userId.snowflakeString}", method = "DELETE", expectedStatus = 204)(_ => ())
+      request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}/reactions/$emoji/@{userId.snowflakeString}", method = "DELETE", expectedStatus = 204)(unit)
    
     def getReactions(channelId: Snowflake, messageId: Snowflake, emoji: String, before: Snowflake = NoSnowflake,
                      after: Snowflake = NoSnowflake, limit: Int = 100)(implicit s: BackPressureStrategy): Future[Seq[User]] = {
@@ -70,40 +71,92 @@ private[headache] trait DiscordRestApiSupport {
       request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}/reactions/$emoji", queryParams = params)(Json.parse(_).dyn.extract[Seq[User]])
     }
     def deleteAllReactions(channelId: Snowflake, messageId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] = 
-      request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}/reactions", method = "DELETE", expectedStatus = 204)(_ => ())
+      request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}/reactions", method = "DELETE", expectedStatus = 204)(unit)
 
     def editChannelPermissions(channelId: Snowflake, overwriteId: Snowflake, allow: Array[Permission],
                                deny: Array[Permission], tpe: String)(implicit s: BackPressureStrategy): Future[Unit] = {
       val body = Json.obj("allow" -> Permissions.compact(allow:_*), "deny" -> Permissions.compact(deny:_*), "type" -> tpe)
-      request(channelId.snowflakeString, extraPath = s"/permissions/${overwriteId.snowflakeString}", method = "PUT", body = body, expectedStatus = 204)(_ => ())
+      request(channelId.snowflakeString, extraPath = s"/permissions/${overwriteId.snowflakeString}", method = "PUT", body = body, expectedStatus = 204)(unit)
     }
     
 //    def getChannelInvites(channelId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] = 
 //      request(channelId.snowflakeString, extraPath = "/invites")
     
     def deleteChannelPermission(channelId: Snowflake, overwriteId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
-      request(channelId.snowflakeString, extraPath = s"/permissions/${overwriteId.snowflakeString}", method = "DELETE", expectedStatus = 204)(_ => ())
+      request(channelId.snowflakeString, extraPath = s"/permissions/${overwriteId.snowflakeString}", method = "DELETE", expectedStatus = 204)(unit)
     
     def triggerTypingIndicator(channelId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
-      request(channelId.snowflakeString, extraPath = "/typing", method = "POST", expectedStatus = 204)(_ => ())
+      request(channelId.snowflakeString, extraPath = "/typing", method = "POST", expectedStatus = 204)(unit)
     
     def getPinnedMessages(channelId: Snowflake)(implicit s: BackPressureStrategy): Future[Seq[Message]] =
       request(channelId.snowflakeString, extraPath = "/pins")(Json.parse(_).dyn.extract[Seq[Message]])
     def addPinnedChannelMessage(channelId: Snowflake, messageId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
-      request(channelId.snowflakeString, extraPath = s"/pins/${messageId.snowflakeString}", method = "PUT", expectedStatus = 204)(_ => ())
+      request(channelId.snowflakeString, extraPath = s"/pins/${messageId.snowflakeString}", method = "PUT", expectedStatus = 204)(unit)
     def deletePinnedChannelMessage(channelId: Snowflake, messageId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
-      request(channelId.snowflakeString, extraPath = s"/pins/${messageId.snowflakeString}", method = "DELETE", expectedStatus = 204)(_ => ())
+      request(channelId.snowflakeString, extraPath = s"/pins/${messageId.snowflakeString}", method = "DELETE", expectedStatus = 204)(unit)
     
     def groupDmAddRecipient(channelId: Snowflake, userId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
-      ??? //request(channelId.snowflakeString, extraPath = s"/recipients/${userId.snowflakeString}", method = "PUT", expectedStatus = 204)(_ => ())
+      ??? //request(channelId.snowflakeString, extraPath = s"/recipients/${userId.snowflakeString}", method = "PUT", expectedStatus = 204)(unit)
     
     def groupDmRemoveRecipient(channelId: Snowflake, userId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
-      request(channelId.snowflakeString, extraPath = s"/recipients/${userId.snowflakeString}", method = "DELETE", expectedStatus = 204)(_ => ())
+      request(channelId.snowflakeString, extraPath = s"/recipients/${userId.snowflakeString}", method = "DELETE", expectedStatus = 204)(unit)
+  }
+  
+  object guilds extends Endpoint {
+    def baseRequest(guildId: String) = s"https://discordapp.com/api/guilds/${guildId}"
+    
+    def get(guildId: Snowflake)(implicit s: BackPressureStrategy): Future[Guild] = request(guildId.snowflakeString)(Json.parse(_).dyn.extract[Guild])
+    def modify(guildId: Snowflake, modification: GuildModification)(implicit s: BackPressureStrategy): Future[Guild] = 
+      request(guildId.snowflakeString, method = "PATCH", body = Json.toJson(modification))(Json.parse(_).dyn.extract[Guild])
+    def delete(guildId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
+      request(guildId.snowflakeString, method = "DELETE", expectedStatus = 204)(unit)
+    
+    def getChannels(guildId: Snowflake)(implicit s: BackPressureStrategy): Future[Seq[Channel]] =
+      request(guildId.snowflakeString, extraPath = "/channels")(Json.parse(_).dyn.extract[Seq[Channel]])
+    def createChannel(guildId: Snowflake, channel: GuildChannelCreationParams)(implicit s: BackPressureStrategy): Future[Channel] =
+      request(guildId.snowflakeString, extraPath = "/channels", method = "POST", body = Json.toJson(channel))(Json.parse(_).dyn.extract[Channel])
+    def modifyChannelPositions(guildId: Snowflake, channelId: Snowflake, position: Int)(implicit s: BackPressureStrategy): Future[Unit] =
+      request(guildId.snowflakeString, extraPath = "/channels", method = "PATCH",
+              body = Json.obj("id" -> channelId.snowflakeString, "position" -> position), expectedStatus = 204)(unit)
+    
+    def addMemberRole(guildId: Snowflake, userId: Snowflake, roleId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
+      request(guildId.snowflakeString, extraPath = s"/members/${userId.snowflakeString}/roles/${roleId.snowflakeString}",
+              method = "PUT", expectedStatus = 204)(unit)
+    def removeMemberRole(guildId: Snowflake, userId: Snowflake, roleId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
+      request(guildId.snowflakeString, extraPath = s"/members/${userId.snowflakeString}/roles/${roleId.snowflakeString}",
+              method = "DELETE", expectedStatus = 204)(unit)
+    
+    def removeMember(guildId: Snowflake, userId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
+      request(guildId.snowflakeString, extraPath = s"/members/${userId.snowflakeString}", method = "DELETE", expectedStatus = 204)(unit)
+    
+    
+    def getBans(guildId: Snowflake)(implicit s: BackPressureStrategy): Future[Seq[Ban]] =
+      request(guildId.snowflakeString, extraPath = "/bans")(Json.parse(_).dyn.extract[Seq[Ban]])
+    def getBan(guildId: Snowflake, userId: Snowflake)(implicit s: BackPressureStrategy): Future[Ban] =
+      request(guildId.snowflakeString, extraPath = s"/bans/${userId.snowflakeString}")(Json.parse(_).dyn.extract[Ban])
+    def createBan(guildId: Snowflake, userId: Snowflake, deleteMessageDays: Int, reason: String)(implicit s: BackPressureStrategy): Future[Ban] =
+      request(guildId.snowflakeString, extraPath = s"/bans/${userId.snowflakeString}",
+              queryParams = Seq("delete-message-days" -> deleteMessageDays.toString, "reason" -> reason))(Json.parse(_).dyn.extract[Ban])
+    def removeBan(guildId: Snowflake, userId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
+      request(guildId.snowflakeString, extraPath = s"/bans/${userId.snowflakeString}", method = "DELETE")(unit)
+    
+    def getRoles(guildId: Snowflake)(implicit s: BackPressureStrategy): Future[Seq[Role]] =
+      request(guildId.snowflakeString, extraPath = "/roles")(Json.parse(_).dyn.extract[Seq[Role]])
+    def createRole(guildId: Snowflake, params: GuildRoleCreationParams)(implicit s: BackPressureStrategy): Future[Role] =
+      request(guildId.snowflakeString, extraPath = "/roles", method = "POST", body = Json.toJson(params))(Json.parse(_).dyn.extract[Role])
+    def modifyRolePositions(guildId: Snowflake, roleId: Snowflake, position: Int)(implicit s: BackPressureStrategy): Future[Role] =
+      request(guildId.snowflakeString, extraPath = "/roles", method = "PATCH",
+              queryParams = Seq("id" -> roleId.snowflakeString, "position" -> position.toString))(Json.parse(_).dyn.extract[Role])
+    def modifyRole(guildId: Snowflake, roleId: Snowflake, params: GuildRoleCreationParams)(implicit s: BackPressureStrategy): Future[Role] =
+      request(guildId.snowflakeString, extraPath = s"/roles/${roleId.snowflakeString}", method = "PATCH",
+              body = Json.toJson(params))(Json.parse(_).dyn.extract[Role])
+    def deleteRole(guildId: Snowflake, roleId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
+      request(guildId.snowflakeString, extraPath = s"/roles/${roleId.snowflakeString}", method = "DELETE", expectedStatus = 204)(unit)
   }
   
   private[this] val rateLimitRegistry = new RateLimitRegistry()
   protected[headache] val baseHeaders = Map[String, java.util.Collection[String]]("Authorization" -> Arrays.asList(token)).asJava
-  private[DiscordRestApiSupport] trait Endpoint {
+  abstract class Endpoint {
     private[this] val queuedRequests = new AtomicInteger()
     
     protected def baseRequest(token: String): String
@@ -141,7 +194,7 @@ private[headache] trait DiscordRestApiSupport {
         
         s match {
           case BackPressureStrategy.Retry(attempts) if attempts > 0 =>
-            import scala.concurrent.ExecutionContext.Implicits.global //it's okay to use it for tihs here
+            import scala.concurrent.ExecutionContext.Implicits.global //it's okay to use it for this here
             res.recoverWith {
               case RateLimitException(reset) => 
                 if (queuedRequests.get >= maxQueuedRequests) throw TooManyQueuedRequests

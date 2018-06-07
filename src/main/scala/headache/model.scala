@@ -204,16 +204,16 @@ case class Message(
   author: User,
   content: String,
   timestamp: Instant,
-  editedTimestamp: Option[Instant],
+  editedTimestamp: Option[Instant] = None,
   tts: Boolean,
   mentionEveryone: Boolean,
   mentions: Array[User],
   mentionRoles: Array[String],
   attachments: Array[Attachment],
   embeds: Array[Embed],
-  nonce: Option[String],
+  nonce: Option[String] = None,
   pinned: Boolean,
-  webhookId: Option[String]
+  webhookId: Option[String] = None
 )
 case class MessageUpdate(
   id: String,
@@ -289,6 +289,11 @@ case class Attachment(
   proxyUrl: String,
   height: Option[Int] = None,
   width: Option[Int] = None
+)
+
+case class Ban(
+  reason: Option[String] = None,
+  user: User
 )
 
 sealed trait Status

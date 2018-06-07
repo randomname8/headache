@@ -90,6 +90,7 @@ object JsonCodecs {
   implicit val embedFooterFormat: Format[EmbedFooter] = Json.format
   implicit val embedFieldFormat: Format[EmbedField] = Json.format
   implicit val attachmentFormat: Format[Attachment] = Json.format
+  implicit val banFormat: Format[Ban] = Json.format
   implicit val embedFormat: Format[Embed] = Json.format
   implicit val messageFormat: Format[Message] = Json.format
   implicit val messageUpdateFormat: Format[MessageUpdate] = Json.format
