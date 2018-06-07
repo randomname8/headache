@@ -5,6 +5,7 @@ import io.netty.util.HashedWheelTimer
 import java.nio.charset.Charset
 import java.util.Arrays
 import java.util.concurrent.atomic.AtomicInteger
+import javax.annotation.Nullable
 import org.asynchttpclient.{AsyncHttpClient, Param, RequestBuilder}
 import play.api.libs.json.{Json, JsValue}
 import scala.collection.JavaConverters._
@@ -30,22 +31,74 @@ private[headache] trait DiscordRestApiSupport {
     def delete(channelId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] = request(channelId.snowflakeString, method = "DELETE")(_ => ())
     
     def getMessage(channelId: Snowflake, messageId: Snowflake)(implicit s: BackPressureStrategy): Future[Message] = 
-      request(channelId.snowflakeString, extraPath = s"/messages/$messageId")(Json.parse(_).dyn.extract[Message])
+      request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}")(Json.parse(_).dyn.extract[Message])
     
     def getMessages(channelId: Snowflake, around: Snowflake = NoSnowflake, before: Snowflake = NoSnowflake, after: Snowflake = NoSnowflake,
                     limit: Int = 100)(implicit s: BackPressureStrategy): Future[Seq[Message]] = {
-      require(around != null || before != null || after != null)
+      require(around != NoSnowflake || before != NoSnowflake || after != NoSnowflake, "one of 'around', 'before' or 'after' must be specified (i.e different from NoSnowflake)")
       val params = Seq("limit" -> limit.toString) ++ optSnowflake(around).map("around" -> _.snowflakeString) ++ 
-        optSnowflake(before).map("before" -> _.snowflakeString) ++ optSnowflake(after).map("after" -> _.snowflakeString)
+      optSnowflake(before).map("before" -> _.snowflakeString) ++ optSnowflake(after).map("after" -> _.snowflakeString)
       request(channelId.snowflakeString, extraPath = "/messages", queryParams = params.toSeq)(Json.parse(_).dyn.extract[Seq[Message]])
     }
     
-    def createMessage(channelId: Snowflake, message: String, embed: Embed = null, tts: Boolean = false)(implicit s: BackPressureStrategy): Future[Message] = {
+    def createMessage(channelId: Snowflake, message: String, @Nullable embed: Embed = null, tts: Boolean = false)(implicit s: BackPressureStrategy): Future[Message] = {
       val body = Json.obj("content" -> message, "nonce" -> (null: String), "tts" -> tts, "embed" -> Option(embed))
       request(channelId.snowflakeString, extraPath = "/messages", method = "POST", body = body)(Json.parse(_).dyn.extract[Message])
     }
+    def editMessage(channelId: Snowflake, messageId: Snowflake, @Nullable content: String = null,
+                    @Nullable embed: Embed = null)(implicit s: BackPressureStrategy): Future[Message] = {
+      require(content != null || embed != null, "content and embed cant both be null")
+      val body = Json.obj("content" -> Option(content), "embed" -> Option(embed))
+      request(channelId.snowflakeString, extraPath = "/messages", method = "PATCH", body = body)(Json.parse(_).dyn.extract[Message])
+    }
+    def deleteMessage(channelId: Snowflake, messageId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
+      request(channelId.snowflakeString, extraPath = "/messages", method = "DELETE", expectedStatus = 204)(_ => ())
+    def bulkDeleteMessages(channelId: Snowflake, messageIds: Array[Snowflake])(implicit s: BackPressureStrategy): Future[Unit] =
+      request(channelId.snowflakeString, extraPath = "/messages/bulk-delete", method = "POST", body = Json.toJson(messageIds), expectedStatus = 204)(_ => ())
     
-    //more to come
+    
+    def createReaction(channelId: Snowflake, messageId: Snowflake, emoji: String)(implicit s: BackPressureStrategy): Future[Unit] = 
+      request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}/reactions/$emoji/@me", method = "PUT", expectedStatus = 204)(_ => ())
+    def deleteOwnReaction(channelId: Snowflake, messageId: Snowflake, emoji: String)(implicit s: BackPressureStrategy): Future[Unit] = 
+      request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}/reactions/$emoji/@me", method = "DELETE", expectedStatus = 204)(_ => ())
+    def deleteUserReaction(channelId: Snowflake, messageId: Snowflake, emoji: String, userId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] = 
+      request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}/reactions/$emoji/@{userId.snowflakeString}", method = "DELETE", expectedStatus = 204)(_ => ())
+   
+    def getReactions(channelId: Snowflake, messageId: Snowflake, emoji: String, before: Snowflake = NoSnowflake,
+                     after: Snowflake = NoSnowflake, limit: Int = 100)(implicit s: BackPressureStrategy): Future[Seq[User]] = {
+      val params = Seq("limit" -> limit.toString) ++ optSnowflake(before).map("before" -> _.snowflakeString) ++ optSnowflake(after).map("after" -> _.snowflakeString)
+      request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}/reactions/$emoji", queryParams = params)(Json.parse(_).dyn.extract[Seq[User]])
+    }
+    def deleteAllReactions(channelId: Snowflake, messageId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] = 
+      request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}/reactions", method = "DELETE", expectedStatus = 204)(_ => ())
+
+    def editChannelPermissions(channelId: Snowflake, overwriteId: Snowflake, allow: Array[Permission],
+                               deny: Array[Permission], tpe: String)(implicit s: BackPressureStrategy): Future[Unit] = {
+      val body = Json.obj("allow" -> Permissions.compact(allow:_*), "deny" -> Permissions.compact(deny:_*), "type" -> tpe)
+      request(channelId.snowflakeString, extraPath = s"/permissions/${overwriteId.snowflakeString}", method = "PUT", body = body, expectedStatus = 204)(_ => ())
+    }
+    
+//    def getChannelInvites(channelId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] = 
+//      request(channelId.snowflakeString, extraPath = "/invites")
+    
+    def deleteChannelPermission(channelId: Snowflake, overwriteId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
+      request(channelId.snowflakeString, extraPath = s"/permissions/${overwriteId.snowflakeString}", method = "DELETE", expectedStatus = 204)(_ => ())
+    
+    def triggerTypingIndicator(channelId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
+      request(channelId.snowflakeString, extraPath = "/typing", method = "POST", expectedStatus = 204)(_ => ())
+    
+    def getPinnedMessages(channelId: Snowflake)(implicit s: BackPressureStrategy): Future[Seq[Message]] =
+      request(channelId.snowflakeString, extraPath = "/pins")(Json.parse(_).dyn.extract[Seq[Message]])
+    def addPinnedChannelMessage(channelId: Snowflake, messageId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
+      request(channelId.snowflakeString, extraPath = s"/pins/${messageId.snowflakeString}", method = "PUT", expectedStatus = 204)(_ => ())
+    def deletePinnedChannelMessage(channelId: Snowflake, messageId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
+      request(channelId.snowflakeString, extraPath = s"/pins/${messageId.snowflakeString}", method = "DELETE", expectedStatus = 204)(_ => ())
+    
+    def groupDmAddRecipient(channelId: Snowflake, userId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
+      ??? //request(channelId.snowflakeString, extraPath = s"/recipients/${userId.snowflakeString}", method = "PUT", expectedStatus = 204)(_ => ())
+    
+    def groupDmRemoveRecipient(channelId: Snowflake, userId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
+      request(channelId.snowflakeString, extraPath = s"/recipients/${userId.snowflakeString}", method = "DELETE", expectedStatus = 204)(_ => ())
   }
   
   private[this] val rateLimitRegistry = new RateLimitRegistry()
@@ -60,8 +113,8 @@ private[headache] trait DiscordRestApiSupport {
       
       val base = baseRequest(token)
       var reqBuilder = new RequestBuilder(method).setUrl(base + extraPath).
-        setHeaders(baseHeaders).addHeader("Content-Type", "application/json").setCharset(Charset.forName("utf-8")).
-        setQueryParams(queryParams.map(t => new Param(t._1, t._2)).asJava)
+      setHeaders(baseHeaders).addHeader("Content-Type", "application/json").setCharset(Charset.forName("utf-8")).
+      setQueryParams(queryParams.map(t => new Param(t._1, t._2)).asJava)
       if (body != null) reqBuilder = reqBuilder.setBody(renderJson(body))
       
       val req = reqBuilder.build()

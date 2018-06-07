@@ -14,9 +14,11 @@ libraryDependencies ++= Seq(
   "org.json4s" %% "json4s-native" % "3.5.2",
   "org.scala-stm" %% "scala-stm" % "0.8",
   "org.slf4j" % "slf4j-simple" % "1.7.25",
+  "com.google.code.findbugs" % "jsr305" % "3.0.2",
   "org.scalatest" %% "scalatest" % "3.0.5" % "test",
   "org.openjdk.jol" % "jol-core" % "0.9" % "test",
   "com.github.pathikrit" %% "better-files" % "3.4.0" % "test",
 )
 resolvers += "jitpack.io" at "https://jitpack.io"
 
+outputStrategy := Some(StdoutOutput)
