@@ -169,6 +169,7 @@ private[headache] trait DiscordRestApiSupport {
       setHeaders(baseHeaders).addHeader("Content-Type", "application/json").setCharset(Charset.forName("utf-8")).
       setQueryParams(queryParams.map(t => new Param(t._1, t._2)).asJava)
       if (body != null) reqBuilder = reqBuilder.setBody(renderJson(body))
+      else reqBuilder.setHeader("Content-Length", "0")
       
       val req = reqBuilder.build()
       
