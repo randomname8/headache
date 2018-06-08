@@ -1,0 +1,5 @@
+@ParametersAreNonnullByDefault
+@headache.ReturnTypesAreNonNullByDefault
+package headache;
+
+import javax.annotation.ParametersAreNonnullByDefault;
