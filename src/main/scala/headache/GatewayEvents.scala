@@ -24,7 +24,7 @@ object GatewayEvents {
     case object GuildMemberAdd extends EventType("GUILD_MEMBER_ADD")
     case object GuildMemberRemove extends EventType("GUILD_MEMBER_REMOVE")
     case object GuildMemberUpdate extends EventType("GUILD_MEMBER_UPDATE")
-    case object GuildMemberChunk extends EventType("GUILD_MEMBER_CHUNK")
+    case object GuildMemberChunk extends EventType("GUILD_MEMBERS_CHUNK")
     case object GuildRoleCreate extends EventType("GUILD_ROLE_CREATE")
     case object GuildRoleUpdate extends EventType("GUILD_ROLE_UPDATE")
     case object GuildRoleDelete extends EventType("GUILD_ROLE_DELETE")
