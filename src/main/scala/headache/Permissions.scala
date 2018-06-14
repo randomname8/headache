@@ -67,4 +67,30 @@ object Permissions extends LongEnum[Permission] {
   
   def from(permissions: Long): Seq[Permission] = values.filter(p => (permissions & p.value) == p.value)
   @varargs def compact(permissions: Permission*): Long = permissions.foldLeft(0l)(_ | _.value)
+  
+  
+  private val allPerms: Long = compact(values:_*)
+  
+  /** @see overloaded definition of this method */
+  def calculateFinalPermissions(everyonesRolePermissions: Seq[Permission], appliedRolesPermissions: Seq[Seq[Permission]],
+                                overrides: Seq[PermissionOverwrite]): Seq[Permission] = {
+    from(calculateFinalPermissions(compact(everyonesRolePermissions:_*), appliedRolesPermissions.map(s => compact(s:_*)).toArray,
+                                   overrides.toArray))
+  }
+  /**
+   * Calculate final permissions for an entity.
+   *
+   * @param everyonesRolePermissions The permissions specified for everyone.
+   * @param appliedRolesPermissions The particular permissions assigned via roles to the entity
+   * @param overrides List of overrides for the entity in order, it should contain first the override for the everyone role (since it applies to everyone),
+   *                  then the overrides for the roles the entity has, and finally, the list of overrides specifically for the entity. In pseudocode
+   *                  `everyoneOverrides ++ entity.roles.map(getOverrides) ++ getOverridesFor(entity)`
+   * @return the calculated final permissions for the entity
+   */
+  def calculateFinalPermissions(everyonesRolePermissions: Long, appliedRolesPermissions: Array[Long], overrides: Array[PermissionOverwrite]): Long = {
+    val basePerms = appliedRolesPermissions.foldLeft(everyonesRolePermissions)(_ | _)
+    
+    if ((basePerms | Administrator.value) == Administrator.value) allPerms
+    else overrides.foldLeft(basePerms)((res, overwrite) => (res & ~overwrite.deny) | overwrite.allow)
+  }
 }
