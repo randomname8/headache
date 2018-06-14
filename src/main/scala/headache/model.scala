@@ -97,7 +97,7 @@ case class UnavailableGuild(id: String, unavailable: Boolean)
 case class GuildMember(
   user: User,
   nick: Option[String],
-  roles: Array[String],
+  roles: Array[Snowflake],
   joinedAt: Instant,
   deaf: Boolean,
   mute: Boolean
