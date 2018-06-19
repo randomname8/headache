@@ -9,7 +9,7 @@ import JsonUtils._
 import AhcUtils._
 
 class DiscordClient(val token: String, val listener: DiscordClient.DiscordListener,
-                    val ahc: AsyncHttpClient = DiscordClient.newDefaultAsyncHttlClient) extends GatewayConnectionSupport with VoiceConnectionSupport with rest.DiscordRestApiSupport {
+                    val ahc: AsyncHttpClient = DiscordClient.newDefaultAsyncHttpClient) extends GatewayConnectionSupport with VoiceConnectionSupport with rest.DiscordRestApiSupport {
   import DiscordClient._, DiscordConstants._
   
   protected[headache] val timer = new HashedWheelTimer(
@@ -79,7 +79,7 @@ class DiscordClient(val token: String, val listener: DiscordClient.DiscordListen
   }
 }
 object DiscordClient {
-  def newDefaultAsyncHttlClient: AsyncHttpClient = new DefaultAsyncHttpClient(
+  def newDefaultAsyncHttpClient: AsyncHttpClient = new DefaultAsyncHttpClient(
     new DefaultAsyncHttpClientConfig.Builder().setWebSocketMaxBufferSize(Int.MaxValue).setWebSocketMaxFrameSize(Int.MaxValue).build())
   object DiscordConstants {
     /**
