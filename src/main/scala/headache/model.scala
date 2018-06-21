@@ -128,7 +128,7 @@ case class GuildPresence(
 case class PresenceUser(val id: String)
 
 case class Role(
-  id: String,
+  id: Snowflake,
   name: String,
   color: Int,
   hoist: Boolean,
@@ -199,7 +199,7 @@ object PermissionOverwrite {
 }
 
 case class Message(
-  id: String,
+  id: Snowflake,
   channelId: Snowflake,
   author: User,
   content: String,
