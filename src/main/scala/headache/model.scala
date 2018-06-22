@@ -188,7 +188,7 @@ case class Channel(
   lastPinTimestamp: Option[String] = None,
 )
 
-case class PermissionOverwrite(id: String, tpe: PermissionOverwrite.Type, allow: Long, deny: Long)
+case class PermissionOverwrite(id: Snowflake, tpe: PermissionOverwrite.Type, allow: Long, deny: Long)
 object PermissionOverwrite {
   sealed abstract class Type(val value: String) extends StringEnumEntry
   object Type extends StringEnum[Type] {
