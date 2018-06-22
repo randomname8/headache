@@ -133,7 +133,7 @@ case class Role(
   color: Int,
   hoist: Boolean,
   position: Int,
-  permissions: Int,
+  permissions: Long,
   managed: Boolean,
   mentionable: Boolean
 )
