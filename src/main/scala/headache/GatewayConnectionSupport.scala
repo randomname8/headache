@@ -72,9 +72,9 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
           Json.obj(
             "token" -> token,
             "properties" -> Json.obj(
-              "$os" -> System.getProperty("os.name"),
-              "$browser" -> "strife v1.0",
-              "$device" -> "strife"
+              "$os" -> clientIdentity.os,
+              "$browser" -> clientIdentity.browser,
+              "$device" -> clientIdentity.device
             ),
 //                                        ("$referring_domain" -> "") ~
 //                                        ("$referrer" -> "")*/

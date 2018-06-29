@@ -9,7 +9,8 @@ import JsonUtils._
 import AhcUtils._
 
 class DiscordClient(val token: String, val listener: DiscordClient.DiscordListener,
-                    val ahc: AsyncHttpClient = DiscordClient.newDefaultAsyncHttpClient) extends GatewayConnectionSupport with VoiceConnectionSupport with rest.DiscordRestApiSupport {
+                    val ahc: AsyncHttpClient = DiscordClient.newDefaultAsyncHttpClient,
+                    val clientIdentity: DiscordClient.ClientIdentity = DiscordClient.defaultIdentity) extends GatewayConnectionSupport with VoiceConnectionSupport with rest.DiscordRestApiSupport {
   import DiscordClient._, DiscordConstants._
   
   protected[headache] val timer = new HashedWheelTimer(
@@ -81,6 +82,10 @@ class DiscordClient(val token: String, val listener: DiscordClient.DiscordListen
 object DiscordClient {
   def newDefaultAsyncHttpClient: AsyncHttpClient = new DefaultAsyncHttpClient(
     new DefaultAsyncHttpClientConfig.Builder().setWebSocketMaxBufferSize(Int.MaxValue).setWebSocketMaxFrameSize(Int.MaxValue).build())
+  
+  def defaultIdentity = ClientIdentity(System.getProperty("os.name"), "headache", "headache")
+  final case class ClientIdentity(os: String, browser: String, device: String)
+  
   object DiscordConstants {
     /**
      * The base URL.
