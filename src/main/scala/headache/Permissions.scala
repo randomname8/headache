@@ -3,7 +3,9 @@ package headache
 import enumeratum.values.{LongEnum, LongEnumEntry}
 import scala.annotation.varargs
 
-sealed abstract class Permission(val value: Long) extends LongEnumEntry
+sealed abstract class Permission(val value: Long) extends LongEnumEntry {
+  @inline def existsIn(l: Long) = (l & value) == value
+}
 object Permissions extends LongEnum[Permission] {
   val values = findValues
   case object CreateInstantInvite extends Permission(0x00000001l)
@@ -65,8 +67,8 @@ object Permissions extends LongEnum[Permission] {
   val manageEmojis        = ManageEmojis        
   
   
-  def from(permissions: Long): Seq[Permission] = values.filter(p => (permissions & p.value) == p.value)
-  @varargs def compact(permissions: Permission*): Long = permissions.foldLeft(0l)(_ | _.value)
+  @inline def from(permissions: Long): Seq[Permission] = values.filter(p => (permissions & p.value) == p.value)
+  @varargs @inline def compact(permissions: Permission*): Long = permissions.foldLeft(0l)(_ | _.value)
   
   
   private val allPerms: Long = compact(values:_*)
