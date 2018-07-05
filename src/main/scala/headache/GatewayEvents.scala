@@ -169,7 +169,7 @@ object GatewayEvents {
   )
   object PresenceUpdateEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.PresenceUpdate) Some(ge.payload().d.extract[PresenceUpdate]) else None }
   case class PresenceUser(
-    id: String,
+    id: Snowflake,
     userName: Option[String] = None,
     discriminator: Option[String] = None,
     avatar: Option[String] = None,

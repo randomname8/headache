@@ -76,6 +76,8 @@ object JsonCodecs {
   //cached formats
   implicit val userFormat: Format[User] = Json.format
   implicit val guildMemberFormat: Format[GuildMember] = Json.format
+  implicit val gameStatusTimestampsFormat: Format[GameStatus.Timestamps] = Json.format
+  implicit val gameStatusAssetsFormat: Format[GameStatus.Assets] = Json.format
   implicit val gameStatusFormat: Format[GameStatus] = Json.format
   implicit val guildUserFormat: Format[PresenceUser] = Json.format
   implicit val guildPresenceFormat: Format[GuildPresence] = Json.format

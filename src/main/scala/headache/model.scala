@@ -111,12 +111,18 @@ object GameStatus {
     case object Streaming extends Type(1)
     case object Listening extends Type(2)
   }
+  case class Timestamps(start: Option[Instant], end: Option[Instant])
+  case class Assets(largeImage: Option[String], largeText: Option[String], smallImage: Option[String], smallText: Option[String])
 }
 case class GameStatus(
   name: String,
   tpe: Option[GameStatus.Type],
   url: Option[String],
-  details: Option[String]
+  timestamps: Option[GameStatus.Timestamps],
+  applicationId: Option[Snowflake],
+  state: Option[String],
+  details: Option[String],
+  assets: Option[GameStatus.Assets],
 )
 
 case class GuildPresence(
