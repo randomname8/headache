@@ -42,7 +42,7 @@ object JsonCodecs {
 //      case other => inner.reads(other)
 //    }
 //  }
-  implicit def optionReads[T: Reads]: Reads[Option[T]] = Reads.optionWithNull[T]
+//  implicit def optionReads[T: Reads]: Reads[Option[T]] = Reads.optionWithNull[T]
   implicit def eitherFormat[L: Format, R: Format]: Format[L Either R] = new Format[L Either R] {
     override def reads(jv: JsValue) = Reads.of[R].reads(jv).map(Right.apply) match {
       case errRight: JsError => Reads.of[L].reads(jv).map(Left.apply) match {

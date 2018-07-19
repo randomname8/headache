@@ -269,7 +269,7 @@ case class EmbedImage(
   height: Int,
   width: Int
 )
-case class EmbedProvider(name: String, url: String)
+case class EmbedProvider(name: String, url: Option[String] = None)
 case class EmbedAuthor(
   name: String,
   url: Option[String] = None,
