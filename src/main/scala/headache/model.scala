@@ -110,6 +110,7 @@ object GameStatus {
     case object Playing extends Type(0)
     case object Streaming extends Type(1)
     case object Listening extends Type(2)
+    case object Watching extends Type(3)
   }
   case class Timestamps(start: Option[Instant], end: Option[Instant])
   case class Assets(largeImage: Option[String], largeText: Option[String], smallImage: Option[String], smallText: Option[String])
