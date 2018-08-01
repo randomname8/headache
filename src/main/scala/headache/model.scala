@@ -223,7 +223,7 @@ case class Message(
   webhookId: Option[String] = None
 )
 case class MessageUpdate(
-  id: String,
+  id: Snowflake,
   channelId: Snowflake,
   content: Option[String],
   editedTimestamp: Option[Instant],
