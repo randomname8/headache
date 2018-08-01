@@ -225,17 +225,17 @@ case class Message(
 case class MessageUpdate(
   id: Snowflake,
   channelId: Snowflake,
-  content: Option[String],
-  editedTimestamp: Option[Instant],
-  tts: Option[Boolean],
-  mentionEveryone: Option[Boolean],
-  mentions: Array[User],
-  mentionRoles: Array[String],
-  attachments: Array[Attachment],
-  embeds: Array[Embed],
-  nonce: Option[String],
-  pinned: Option[Boolean],
-  webhookId: Option[String]
+  content: Option[String] = None,
+  editedTimestamp: Option[Instant] = None,
+  tts: Option[Boolean] = None,
+  mentionEveryone: Option[Boolean] = None,
+  mentions: Array[User] = Array.empty,
+  mentionRoles: Array[String] = Array.empty,
+  attachments: Array[Attachment] = Array.empty,
+  embeds: Array[Embed] = Array.empty,
+  nonce: Option[String] = None,
+  pinned: Option[Boolean] = None,
+  webhookId: Option[String] = None
 )
 
 case class Embed(
