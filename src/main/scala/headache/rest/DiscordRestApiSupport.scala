@@ -34,6 +34,11 @@ private[headache] trait DiscordRestApiSupport {
     def getMessage(channelId: Snowflake, messageId: Snowflake)(implicit s: BackPressureStrategy): Future[Message] = 
       request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}")(Json.parse(_).dyn.extract[Message])
     
+    def ack(channelId: Snowflake, messageId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] = {
+      val body = Json.obj("manual" -> true)
+      request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}/ack", method = "POST", body = body)(unit)
+    }
+    
     def getMessages(channelId: Snowflake, around: Snowflake = NoSnowflake, before: Snowflake = NoSnowflake, after: Snowflake = NoSnowflake,
                     limit: Int = 100)(implicit s: BackPressureStrategy): Future[Seq[Message]] = {
       require(around != NoSnowflake || before != NoSnowflake || after != NoSnowflake, "one of 'around', 'before' or 'after' must be specified (i.e different from NoSnowflake)")
