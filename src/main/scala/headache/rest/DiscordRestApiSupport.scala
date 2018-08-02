@@ -6,7 +6,8 @@ import java.nio.charset.Charset
 import java.util.Arrays
 import java.util.concurrent.atomic.AtomicInteger
 import javax.annotation.Nullable
-import org.asynchttpclient.{AsyncHttpClient, Param, RequestBuilder}
+import org.asynchttpclient.request.body.multipart.{Part, StringPart}
+import org.asynchttpclient.{AsyncHttpClient, Param, RequestBuilder, Request}
 import play.api.libs.json.{Json, JsValue}
 import scala.collection.JavaConverters._
 import scala.concurrent.{Future, Promise}
@@ -47,9 +48,21 @@ private[headache] trait DiscordRestApiSupport {
       request(channelId.snowflakeString, extraPath = "/messages", queryParams = params.toSeq)(Json.parse(_).dyn.extract[Seq[Message]])
     }
     
-    def createMessage(channelId: Snowflake, message: String, @Nullable embed: Embed = null, tts: Boolean = false)(implicit s: BackPressureStrategy): Future[Message] = {
+    def createMessage(channelId: Snowflake, message: String, @Nullable embed: Embed = null, tts: Boolean = false, attachments: Array[Part] = Array.empty)(implicit s: BackPressureStrategy): Future[Message] = {
       val body = Json.obj("content" -> message, "nonce" -> (null: String), "tts" -> tts, "embed" -> Option(embed))
-      request(channelId.snowflakeString, extraPath = "/messages", method = "POST", body = body)(Json.parse(_).dyn.extract[Message])
+      if (attachments.isEmpty)
+        request(channelId.snowflakeString, extraPath = "/messages", method = "POST", body = body)(Json.parse(_).dyn.extract[Message])
+      else {
+        val base = baseRequest(channelId.snowflakeString)
+        val reqBuilder = new RequestBuilder("POST").setUrl(base + "/messages").
+        setHeaders(baseHeaders).addHeader("Content-Type", "multipart/form-data").
+        setBodyParts(Arrays.asList(attachments :+ new StringPart("payload_json", renderJson(body), "application/json", Charset.forName("utf-8")):_*))
+      
+        println("sending multipart form data")
+        
+        val req = reqBuilder.build()
+        request(base, req, Json.parse(_).dyn.extract[Message], 200, s)
+      }
     }
     def editMessage(channelId: Snowflake, messageId: Snowflake, @Nullable content: String = null,
                     @Nullable embed: Embed = null)(implicit s: BackPressureStrategy): Future[Message] = {
@@ -177,45 +190,44 @@ private[headache] trait DiscordRestApiSupport {
       else reqBuilder.setHeader("Content-Length", "0")
       
       val req = reqBuilder.build()
-      
-      def request(s: BackPressureStrategy): Future[T] = {
-        val res = rateLimitRegistry.rateLimitFor(base) match {
-          case Some(deadline) => Future.failed(RateLimitException(deadline.timeLeft))
-          case _ => 
-            AhcUtils.request(ahc.prepareRequest(req)){ resp =>
-              lazy val body = resp.getResponseBody(Charset.forName("utf-8"))
-              resp.getStatusCode match {
-                case `expectedStatus` => parser(body)
-                case 429 =>
-                  val rl = Json.parse(body).dyn
-                  val deadline = rl.retry_after.extract[Int].millis
-                  if (rl.global.extract) rateLimitRegistry.registerGlobalRateLimit(deadline.fromNow)
-                  else rateLimitRegistry.registerGlobalRateLimit(deadline.fromNow)
-                  throw RateLimitException(rl.retry_after.extract[Int].millis)
+      request(base, req, parser, expectedStatus, s)
+    }
+    protected def request[T](baseToken: String, req: Request, parser: String => T, expectedStatus: Int, s: BackPressureStrategy): Future[T] = {
+      val res = rateLimitRegistry.rateLimitFor(baseToken) match {
+        case Some(deadline) => Future.failed(RateLimitException(deadline.timeLeft))
+        case _ => 
+          AhcUtils.request(ahc.prepareRequest(req)){ resp =>
+            lazy val body = resp.getResponseBody(Charset.forName("utf-8"))
+            resp.getStatusCode match {
+              case `expectedStatus` => parser(body)
+              case 429 =>
+                val rl = Json.parse(body).dyn
+                val deadline = rl.retry_after.extract[Int].millis
+                if (rl.global.extract) rateLimitRegistry.registerGlobalRateLimit(deadline.fromNow)
+                else rateLimitRegistry.registerGlobalRateLimit(deadline.fromNow)
+                throw RateLimitException(rl.retry_after.extract[Int].millis)
 
-                case other => throw new RuntimeException(s"Unexpected status code $other:\n$body")
-              }
+              case other => throw new RuntimeException(s"Unexpected status code $other:\n$body")
             }
-        }
-        
-        s match {
-          case BackPressureStrategy.Retry(attempts) if attempts > 0 =>
-            import scala.concurrent.ExecutionContext.Implicits.global //it's okay to use it for this here
-            res.recoverWith {
-              case RateLimitException(reset) => 
-                if (queuedRequests.get >= maxQueuedRequests) throw TooManyQueuedRequests
-                val promise = Promise[T]()
-                timer.newTimeout({ timeout => 
-                    promise completeWith request(BackPressureStrategy.Retry(attempts - 1))
-                    queuedRequests.decrementAndGet
-                  }, reset.length, reset.unit)
-                promise.future
-            }
-            
-          case _ => res
-        }
+          }
       }
-      request(s)
+        
+      s match {
+        case BackPressureStrategy.Retry(attempts) if attempts > 0 =>
+          import scala.concurrent.ExecutionContext.Implicits.global //it's okay to use it for this here
+          res.recoverWith {
+            case RateLimitException(reset) => 
+              if (queuedRequests.get >= maxQueuedRequests) throw TooManyQueuedRequests
+              val promise = Promise[T]()
+              timer.newTimeout({ timeout => 
+                  promise completeWith request(baseToken, req, parser, expectedStatus, BackPressureStrategy.Retry(attempts - 1))
+                  queuedRequests.decrementAndGet
+                }, reset.length, reset.unit)
+              promise.future
+          }
+            
+        case _ => res
+      }
     }
   }
   
