@@ -58,8 +58,6 @@ private[headache] trait DiscordRestApiSupport {
         setHeaders(baseHeaders).addHeader("Content-Type", "multipart/form-data").
         setBodyParts(Arrays.asList(attachments :+ new StringPart("payload_json", renderJson(body), "application/json", Charset.forName("utf-8")):_*))
       
-        println("sending multipart form data")
-        
         val req = reqBuilder.build()
         request(base, req, Json.parse(_).dyn.extract[Message], 200, s)
       }
