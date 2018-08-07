@@ -7,7 +7,7 @@ import java.util.Arrays
 import java.util.concurrent.atomic.AtomicInteger
 import javax.annotation.Nullable
 import org.asynchttpclient.request.body.multipart.{Part, StringPart}
-import org.asynchttpclient.{AsyncHttpClient, Param, RequestBuilder, Request}
+import org.asynchttpclient.{AsyncHttpClient, AsyncHandler, Param, RequestBuilder, Request}
 import play.api.libs.json.{Json, JsValue}
 import scala.collection.JavaConverters._
 import scala.concurrent.{Future, Promise}
@@ -48,7 +48,8 @@ private[headache] trait DiscordRestApiSupport {
       request(channelId.snowflakeString, extraPath = "/messages", queryParams = params.toSeq)(Json.parse(_).dyn.extract[Seq[Message]])
     }
     
-    def createMessage(channelId: Snowflake, message: String, @Nullable embed: Embed = null, tts: Boolean = false, attachments: Array[Part] = Array.empty)(implicit s: BackPressureStrategy): Future[Message] = {
+    def createMessage(channelId: Snowflake, message: String, @Nullable embed: Embed = null, tts: Boolean = false,
+                      attachments: Array[Part] = Array.empty, progressListener: (Long, Long, Long) => Unit = (_, _, _) => ())(implicit s: BackPressureStrategy): Future[Message] = {
       val body = Json.obj("content" -> message, "nonce" -> (null: String), "tts" -> tts, "embed" -> Option(embed))
       if (attachments.isEmpty)
         request(channelId.snowflakeString, extraPath = "/messages", method = "POST", body = body)(Json.parse(_).dyn.extract[Message])
@@ -59,7 +60,7 @@ private[headache] trait DiscordRestApiSupport {
         setBodyParts(Arrays.asList(attachments :+ new StringPart("payload_json", renderJson(body), "application/json", Charset.forName("utf-8")):_*))
       
         val req = reqBuilder.build()
-        request(base, req, Json.parse(_).dyn.extract[Message], 200, s)
+        request(base, req, Json.parse(_).dyn.extract[Message], 200, progressListener, s)
       }
     }
     def editMessage(channelId: Snowflake, messageId: Snowflake, @Nullable content: String = null,
@@ -188,13 +189,13 @@ private[headache] trait DiscordRestApiSupport {
       else reqBuilder.setHeader("Content-Length", "0")
       
       val req = reqBuilder.build()
-      request(base, req, parser, expectedStatus, s)
+      request(base, req, parser, expectedStatus, (_, _, _) => (), s)
     }
-    protected def request[T](baseToken: String, req: Request, parser: String => T, expectedStatus: Int, s: BackPressureStrategy): Future[T] = {
+    protected def request[T](baseToken: String, req: Request, parser: String => T, expectedStatus: Int, progressListener: (Long, Long, Long) => Unit, s: BackPressureStrategy): Future[T] = {
       val res = rateLimitRegistry.rateLimitFor(baseToken) match {
         case Some(deadline) => Future.failed(RateLimitException(deadline.timeLeft))
         case _ => 
-          AhcUtils.request(ahc.prepareRequest(req)){ resp =>
+          AhcUtils.request(ahc.prepareRequest(req))({ resp =>
             lazy val body = resp.getResponseBody(Charset.forName("utf-8"))
             resp.getStatusCode match {
               case `expectedStatus` => parser(body)
@@ -207,7 +208,11 @@ private[headache] trait DiscordRestApiSupport {
 
               case other => throw new RuntimeException(s"Unexpected status code $other:\n$body")
             }
-          }
+          },
+        onContentWriteProgressF = { (amount, current, total) =>
+          progressListener(amount, current, total)
+          AsyncHandler.State.CONTINUE
+        })
       }
         
       s match {
@@ -218,7 +223,7 @@ private[headache] trait DiscordRestApiSupport {
               if (queuedRequests.get >= maxQueuedRequests) throw TooManyQueuedRequests
               val promise = Promise[T]()
               timer.newTimeout({ timeout => 
-                  promise completeWith request(baseToken, req, parser, expectedStatus, BackPressureStrategy.Retry(attempts - 1))
+                  promise completeWith request(baseToken, req, parser, expectedStatus, progressListener, BackPressureStrategy.Retry(attempts - 1))
                   queuedRequests.decrementAndGet
                 }, reset.length, reset.unit)
               promise.future
