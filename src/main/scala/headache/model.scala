@@ -220,7 +220,7 @@ case class Message(
   embeds: Array[Embed],
   nonce: Option[String] = None,
   pinned: Boolean,
-  webhookId: Option[String] = None
+  webhookId: Option[Snowflake] = None
 )
 case class MessageUpdate(
   id: Snowflake,
