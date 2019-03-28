@@ -6,7 +6,6 @@ import java.net.{DatagramSocket, InetSocketAddress, DatagramPacket, SocketTimeou
 import org.asynchttpclient.{ws}
 import play.api.libs.json.{Json, JsValue}
 import scala.concurrent._, duration._, ExecutionContext.Implicits._
-import scala.util.control.NoStackTrace
 import scala.util.control.NonFatal
 import JsonUtils._
 
@@ -23,13 +22,17 @@ private[headache] trait VoiceConnectionSupport { self: DiscordClient =>
       voiceServerUpdate: GatewayEvents.VoiceServerUpdate,
       voiceConsumer: AudioRtpFrame => Unit,
       voiceProducer: () => Array[Byte]
-  ) extends VoiceConnection with ws.WebSocketTextListener with ws.WebSocketCloseCodeReasonListener {
+  ) extends VoiceConnection with ws.WebSocketListener {
     @volatile private[this] var active = true
     @volatile private[this] var websocket: ws.WebSocket = _
+    private[this] var heartbeatsMissed = 0
 
     override def guildId = voiceServerUpdate.guildId
     override def isActive = active
-    override def close() = if (active && websocket != null) websocket.close()
+    override def close() = if (active && websocket != null) {
+      active = false
+      websocket.sendCloseFrame()
+    }
 
     override def onOpen(w: ws.WebSocket): Unit = {
       websocket = w
@@ -39,13 +42,12 @@ private[headache] trait VoiceConnectionSupport { self: DiscordClient =>
         "session_id" -> voiceStateUpdate.sessionId,
         "token" -> voiceServerUpdate.token))))
     }
-    override def onClose(w: ws.WebSocket): Unit = if (isActive) {
-      websocket = null
-      active = false
-      listener.onConnectionClosed(this)
-    }
+//    override def onClose(w: ws.WebSocket): Unit = if (isActive) {
+//      websocket = null
+//      active = false
+//      listener.onConnectionClosed(this)
+//    }
     override def onClose(w: ws.WebSocket, code: Int, reason: String): Unit = if (isActive) {
-      websocket.close()
       websocket = null
       active = false
       listener.onDisconnected(this, code, reason)
@@ -63,7 +65,7 @@ private[headache] trait VoiceConnectionSupport { self: DiscordClient =>
           val port = payload.port.extract[Int]
           val serverIp = payload.ip.extract[String]
           //          val modes = payload.modes.extract[Seq[String]]
-          val heartbeatInterval = payload.heartbeat_interval.extract[Int]
+          val heartbeatInterval = (payload.heartbeat_interval.extract[Int] * 0.75).toInt //complying with the required modification due to discord bug, this needs to be changed again once they fix it
           val socket = new DatagramSocket()
           socket.connect(new InetSocketAddress(serverIp, port))
           val ourIp = discoverIp(ssrc, socket)
@@ -107,7 +109,6 @@ private[headache] trait VoiceConnectionSupport { self: DiscordClient =>
                 case e: IOException =>
                   listener.onConnectionError(VoiceConnectionImpl.this, e)
                   close()
-                  onClose(websocket)
               }
               sendingAudio = true
             } else if (sendingAudio) {
@@ -161,7 +162,7 @@ private[headache] trait VoiceConnectionSupport { self: DiscordClient =>
     }
 
     override def onError(ex: Throwable): Unit = listener.onConnectionError(this, ex)
-    override def onMessage(msg: String): Unit = {
+    override def onTextFrame(msg: String, finalFragment: Boolean, rsv: Int): Unit = {
       val payload = Json.parse(msg).dyn
 
       try {
@@ -177,7 +178,7 @@ private[headache] trait VoiceConnectionSupport { self: DiscordClient =>
     def send(msg: String) = {
       if (!active) throw new IllegalStateException(s"$this is closed!")
       listener.onMessageBeingSent(this, msg)
-      websocket.sendMessage(msg)
+      websocket.sendTextFrame(msg)
     }
     def gatewayMessage(op: IntEnumEntry, data: JsValue, eventType: Option[String] = None): JsValue = Json.obj(
       "op" -> op.value,
@@ -189,14 +190,14 @@ private[headache] trait VoiceConnectionSupport { self: DiscordClient =>
         Future { // don't hog the timer thread
           send(renderJson(gatewayMessage(VoiceOp.Heartbeat, Json toJson System.currentTimeMillis)))
           //after sending the heartbeat, change the current behaviour to detect the answer
-          //if no answer is received in 5 seconds, reconnect.
+          //if no answer is received, reconnect.
           val prevBehaviour = stateMachine.current
 
           val timeout = timer.newTimeout({ timeout =>
             if (!timeout.isCancelled && isActive) {
-              listener.onConnectionError(this, new RuntimeException("Did not receive a HeartbeatAck in 5 seconds!") with NoStackTrace)
-              close()
-              onClose(websocket)
+              heartbeatsMissed += 1
+              listener.onHeartbeatMissed(this, heartbeatsMissed)
+              nextHeartbeat(interval) //we still attempt more heartbeats, it's up to the user to decide what to do with missed heartbeats
             }
           }, (interval * 0.9).toLong, MILLISECONDS)
 

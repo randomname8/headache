@@ -47,7 +47,7 @@ class DiscordClient(val token: String, val listener: DiscordClient.DiscordListen
     voiceProducer: () => Array[Byte]
   ): Future[VoiceConnection] = {
     val res = new VoiceConnectionImpl(voiceStateUpdate, voiceServerUpdate, voiceConsumer, voiceProducer)
-    val endpoint = voiceServerUpdate.endpoint.split(":", 2)(0)
+    val endpoint = voiceServerUpdate.endpoint.getOrElse(throw new IllegalStateException("No endpoint in VoiceServerUpdate")).split(":", 2)(0)
     val websocketFuture = ahc.prepareGet(s"wss://$endpoint").execute(new ws.WebSocketUpgradeHandler(Arrays.asList(res)))
     val ready = Promise[VoiceConnection]()
     websocketFuture.toCompletableFuture.handle[Unit] {
@@ -193,6 +193,8 @@ object DiscordClient {
     def onConnectionClosed(connection: DiscordClient#Connection): Unit = {}
     def onDisconnected(connection: DiscordClient#Connection, code: Int, reason: String): Unit = {}
     def onConnectionError(connection: DiscordClient#Connection, error: Throwable): Unit = {}
+    
+    def onHeartbeatMissed(connection: DiscordClient#Connection, missedHeartbeats: Int): Unit = {}
   }
 
   object DiscordListenerStateMachine {
@@ -212,6 +214,7 @@ object DiscordClient {
     case class ConnectionClosed(connection: DiscordClient#Connection) extends Event
     case class Disconnected(connection: DiscordClient#Connection, code: Int, reason: String) extends Event
     case class ConnectionError(connection: DiscordClient#Connection, error: Throwable) extends Event
+    case class HeartbeatMissed(connection: DiscordClient#Connection, heartbeatsMissed: Int) extends Event
 
     override def apply(a: E): Unit = synchronized { super.apply(a) }
     private def run(evt: Event): Unit = this.orElse[Event, Unit] {
@@ -231,6 +234,6 @@ object DiscordClient {
     override def onConnectionClosed(connection: DiscordClient#Connection): Unit = run(ConnectionClosed(connection))
     override def onDisconnected(connection: DiscordClient#Connection, code: Int, reason: String): Unit = run(Disconnected(connection, code, reason))
     override def onConnectionError(connection: DiscordClient#Connection, error: Throwable): Unit = run(ConnectionError(connection, error))
-
+    override def onHeartbeatMissed(connection: DiscordClient#Connection, missedHeartbeats: Int) = run(HeartbeatMissed(connection, missedHeartbeats))
   }
 }

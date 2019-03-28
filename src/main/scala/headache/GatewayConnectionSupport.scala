@@ -34,27 +34,35 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
   protected case class SessionData(id: String, gatewayProtocol: Int)
   protected case class LastSessionState(data: SessionData, seq: Long, connectionAttempt: Int)
   protected final class GatewayConnectionImpl(val gateway: String, val shardNumber: Int, val totalShards: Int,
-      lastSession: Option[LastSessionState]) extends GatewayConnection with ws.WebSocketTextListener with ws.WebSocketCloseCodeReasonListener with ws.WebSocketByteListener {
+      lastSession: Option[LastSessionState]) extends GatewayConnection with ws.WebSocketListener {
     @volatile private[this] var active = true
     @volatile private[this] var websocket: ws.WebSocket = _
     @volatile private[this] var seq = 0l
     @volatile private[this] var session: Option[SessionData] = None
+    private[this] var missedHeartbeats = 0
 
     override def isActive = active
-    override def close() = if (active && websocket != null) websocket.close()
+    override def close() = if (active && websocket != null) {
+      active = false
+      websocket.sendCloseFrame()
+    }
 
     override def onOpen(w: ws.WebSocket): Unit = {
       websocket = w
       listener.onConnectionOpened(this)
     }
-    override def onClose(w: ws.WebSocket): Unit = if (isActive) {
-      websocket = null
-      active = false
-      listener.onConnectionClosed(this)
-    }
+//    override def onClose(w: ws.WebSocket): Unit = if (isActive) {
+//      websocket = null
+//      active = false
+//      listener.onConnectionClosed(this)
+//    }
     override def onClose(w: ws.WebSocket, code: Int, reason: String): Unit = if (isActive) { //after a break down, netty will eventually realize that the socket broke, and even though we already called websocket.close(), it will eventually invoke this method.
-      listener.onDisconnected(this, code, reason)
-      reconnect(DisconnectedByServer)
+      websocket = null
+      if (active) { //if we are no longer active, it means the close() method was called, and so we must not reconnect
+        listener.onDisconnected(this, code, reason)
+        reconnect(DisconnectedByServer)
+      }
+      active = false //we are not active anymore after this step
     }
     override def toString = s"GatewayConnection(gw=$gateway, shardNumber=$shardNumber, totalShards=$totalShards, seq=$seq, session=${session.map(_.id)})"
 
@@ -142,7 +150,7 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
     }
 
     override def onError(ex: Throwable): Unit = listener.onConnectionError(this, Option(ex) getOrElse new RuntimeException("Something went wrong but we got null throwable?"))
-    override def onMessage(msg: String): Unit = {
+    override def onTextFrame(msg: String, finalFragment: Boolean, rsv: Int): Unit = {
       //do basic stream parsing to obtain general headers, the idea is to avoid computation as much as possible here.
 
       val parser = (p: JsonParser.Parser) => {
@@ -198,7 +206,7 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
     private[this] val compressedMessage = new ByteArrayOutputStream()
     private[this] val uncompressedMessage = new ByteArrayOutputStream()
     private[this] val inflater = new Inflater
-    override def onMessage(bytes: Array[Byte]): Unit = {
+    override def onBinaryFrame(bytes: Array[Byte], finalFragment: Boolean, rsv: Int): Unit = {
       accumulatedCompressedChunks += bytes
       val l = bytes.length
       if (l >= 4 && bytes(l - 4) == 0 && bytes(l - 3) == 0 && bytes(l - 2) == -1 && bytes(l - 1) == -1) { //ZLIB suffix == 0x0000ffff
@@ -209,14 +217,14 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
         compressedMessage.writeTo(new InflaterOutputStream(uncompressedMessage, inflater))
         val reader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(uncompressedMessage.toByteArray)))
         val msg = reader.lines.collect(java.util.stream.Collectors.joining())
-        onMessage(msg)
+        onTextFrame(msg, finalFragment, rsv)
       }
     }
 
     def send(msg: String) = {
       if (!active) throw new IllegalStateException(s"Shard $shardNumber is closed!")
       listener.onMessageBeingSent(this, msg)
-      websocket.sendMessage(msg)
+      websocket.sendTextFrame(msg)
     }
 
     def gatewayMessage(op: IntEnumEntry, data: JsValue, eventType: Option[String] = None): JsValue = Json.obj(
@@ -254,13 +262,14 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
         Future {
           send(renderJson(Json.obj("op" -> GatewayOp.Heartbeat.value, "d" -> seq)))
           //after sending the heartbeat, change the current behaviour to detect the answer
-          //if no answer is received in 5 seconds, reconnect.
+          //if no answer is received, reconnect.
           val prevBehaviour = stateMachine.current
 
           val heartbeatTimeout = (interval * 0.8).toInt.millis.toSeconds
           val timeout = timer.newTimeout({ timeout =>
             if (!timeout.isCancelled && isActive) {
-              listener.onConnectionError(this, new RuntimeException(s"Did not receive a HeartbeatAck in ${heartbeatTimeout} seconds!") with NoStackTrace)
+              missedHeartbeats += 1
+              listener.onHeartbeatMissed(this, missedHeartbeats)
               reconnect(HeartbeatMissed)
             }
           }, heartbeatTimeout, SECONDS)
@@ -281,16 +290,13 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
     }
 
     def reconnect(reason: ReconnectReason): Unit = {
-      websocket.close()
-      onClose(websocket)
+      if (websocket != null && active) websocket.sendCloseFrame()
       listener.onReconnecting(this, reason)
       val reconnectInstance = if (session.isDefined) 0 else lastSession.map(_.connectionAttempt + 1).getOrElse(0)
       val newLastSession = session.map(s => LastSessionState(s, seq, reconnectInstance))
       def reconnectAttempt(duration: FiniteDuration): Unit = {
-        timer.newTimeout(
-          _ =>
-            startShard(gateway, shardNumber, totalShards, newLastSession).failed.foreach(_ => reconnectAttempt(5.seconds)),
-          duration.length, duration.unit
+        timer.newTimeout(_ =>
+          startShard(gateway, shardNumber, totalShards, newLastSession).failed.foreach(_ => reconnectAttempt(5.seconds)), duration.length, duration.unit
         )
       }
       if (reconnectInstance > 0) reconnectAttempt(5.seconds)

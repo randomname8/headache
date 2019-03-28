@@ -1,8 +1,9 @@
 package headache
 
+import io.netty.handler.codec.http.HttpHeaders
 import org.asynchttpclient._
-import scala.concurrent._
 import play.api.libs.json.Json
+import scala.concurrent._
 import JsonUtils._
 
 object AhcUtils {
@@ -13,7 +14,7 @@ object AhcUtils {
     onCompletedF: Response => T,
     onBodyPartReceivedF: HttpResponseBodyPart => AsyncHandler.State = null,
     onStatusReceivedF: HttpResponseStatus => AsyncHandler.State = null,
-    onHeadersReceivedF: HttpResponseHeaders => AsyncHandler.State = null,
+    onHeadersReceivedF: HttpHeaders => AsyncHandler.State = null,
     onHeadersWrittenF: () => AsyncHandler.State = null,
     onContentWrittenF: () => AsyncHandler.State = null,
     onContentWriteProgressF: (Long, Long, Long) => AsyncHandler.State = null
@@ -34,7 +35,7 @@ object AhcUtils {
         val r = super.onStatusReceived(header)
         if (onStatusReceivedF != null) onStatusReceivedF(header) else r
       }
-      override def onHeadersReceived(header: HttpResponseHeaders) = {
+      override def onHeadersReceived(header: HttpHeaders) = {
         val r = super.onHeadersReceived(header)
         if (onHeadersReceivedF != null) onHeadersReceivedF(header) else r
       }
