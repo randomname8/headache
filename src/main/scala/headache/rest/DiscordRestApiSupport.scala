@@ -178,8 +178,8 @@ private[headache] trait DiscordRestApiSupport {
     def currentUser()(implicit s: BackPressureStrategy): Future[User] = request(self)(Json.parse(_).dyn.extract[User])
     def user(id: Snowflake)(implicit s: BackPressureStrategy) = request(id.snowflakeString)(Json.parse(_).dyn.extract[User])
     def userDms()(implicit s: BackPressureStrategy): Future[Seq[Channel]] = request(self, extraPath = "/channels")(Json.parse(_).dyn.extract[Seq[Channel]])
-    def createDm(recipientId: Snowflake)(implicit s: BackPressureStrategy): Future[Seq[Channel]] = 
-      request(self, extraPath = "/channels", method = "POST", body = Json.obj("recipient_id" -> recipientId.snowflakeString))(Json.parse(_).dyn.extract[Seq[Channel]])
+    def createDm(recipientId: Snowflake)(implicit s: BackPressureStrategy): Future[Channel] = 
+      request(self, extraPath = "/channels", method = "POST", body = Json.obj("recipient_id" -> recipientId.snowflakeString))(Json.parse(_).dyn.extract[Channel])
   }
   
   private[this] val rateLimitRegistry = new RateLimitRegistry()
