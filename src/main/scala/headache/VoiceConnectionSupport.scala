@@ -197,7 +197,6 @@ private[headache] trait VoiceConnectionSupport { self: DiscordClient =>
             if (!timeout.isCancelled && isActive) {
               heartbeatsMissed += 1
               listener.onHeartbeatMissed(this, heartbeatsMissed)
-              nextHeartbeat(interval) //we still attempt more heartbeats, it's up to the user to decide what to do with missed heartbeats
             }
           }, (interval * 0.9).toLong, MILLISECONDS)
 
