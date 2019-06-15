@@ -116,7 +116,7 @@ private[headache] trait VoiceConnectionSupport { self: DiscordClient =>
               sendingAudio = false
             }
           }
-          var keepAliveCall = 0l
+          var keepAliveCall = 0L
           def keepAliveNatPort() = {
             if (keepAliveCall % (5000 / 20) == 0) { //every 5 seconds
               try socket.send(new DatagramPacket(UdpKeepAlive, UdpKeepAlive.length))
@@ -149,7 +149,7 @@ private[headache] trait VoiceConnectionSupport { self: DiscordClient =>
               keepAliveNatPort()
               receiveAudio()
             } else {
-              cancelTask.put(())
+              cancelTask.cancelled = true
               scala.util.Try(socket.close())
             }
 

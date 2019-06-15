@@ -37,7 +37,7 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
       lastSession: Option[LastSessionState]) extends GatewayConnection with ws.WebSocketListener {
     @volatile private[this] var active = true
     @volatile private[this] var websocket: ws.WebSocket = _
-    @volatile private[this] var seq = 0l
+    @volatile private[this] var seq = 0L
     @volatile private[this] var session: Option[SessionData] = None
     private[this] var missedHeartbeats = 0
 

@@ -2,7 +2,7 @@ package headache
 
 import java.util.concurrent.ArrayBlockingQueue
 import scala.annotation.tailrec
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 class DiscordListenerBuffer(queueSize: Int = 1000/*, var logOutgoingGatewayMessage: Boolean = false, var logIncomingGatewayMessage: Boolean = false*/) extends DiscordClient.DiscordListener {
   private val queue = new ArrayBlockingQueue[GatewayEvents.GatewayEvent](queueSize)

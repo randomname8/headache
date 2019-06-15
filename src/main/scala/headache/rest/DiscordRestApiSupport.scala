@@ -9,9 +9,9 @@ import javax.annotation.Nullable
 import org.asynchttpclient.request.body.multipart.{Part, StringPart}
 import org.asynchttpclient.{AsyncHttpClient, AsyncHandler, Param, RequestBuilder, Request}
 import play.api.libs.json.{Json, JsValue}
-import scala.collection.JavaConverters._
 import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import scala.util.control.{ControlThrowable, NoStackTrace}
 import JsonUtils._, JsonCodecs._
 
@@ -92,7 +92,7 @@ private[headache] trait DiscordRestApiSupport {
 
     def editChannelPermissions(channelId: Snowflake, overwriteId: Snowflake, allow: Array[Permission],
                                deny: Array[Permission], tpe: String)(implicit s: BackPressureStrategy): Future[Unit] = {
-      val body = Json.obj("allow" -> Permissions.compact(allow:_*), "deny" -> Permissions.compact(deny:_*), "type" -> tpe)
+      val body = Json.obj("allow" -> Permissions.compact(allow.toIndexedSeq:_*), "deny" -> Permissions.compact(deny.toIndexedSeq:_*), "type" -> tpe)
       request(channelId.snowflakeString, extraPath = s"/permissions/${overwriteId.snowflakeString}", method = "PUT", body = body, expectedStatus = 204)(unit)
     }
     
