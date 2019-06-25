@@ -40,12 +40,14 @@ object ExplicitContentFilterLevel extends IntEnum[ExplicitContentFilterLevel] {
   case object Disabled extends ExplicitContentFilterLevel(0)
   case object MembersWithoutRoles extends ExplicitContentFilterLevel(1)
   case object AllMembers extends ExplicitContentFilterLevel(2)
+  case class Unk(override val value: Int) extends ExplicitContentFilterLevel(value)
 }
 sealed abstract class NotificationLevel(val value: Int) extends IntEnumEntry
 object NotificationLevel extends IntEnum[NotificationLevel] {
   val values = findValues
   case object AllMessages extends NotificationLevel(0)
   case object OnlyMentions extends NotificationLevel(1)
+  case class Unk(override val value: Int) extends NotificationLevel(value)
 }
 trait GuildDef {
   def id: Snowflake
@@ -111,6 +113,7 @@ object GameStatus {
     case object Streaming extends Type(1)
     case object Listening extends Type(2)
     case object Watching extends Type(3)
+    case class Unk(override val value: Int) extends Type(value)
   }
   case class Timestamps(start: Option[Instant], end: Option[Instant])
   case class Assets(largeImage: Option[String], largeText: Option[String], smallImage: Option[String], smallText: Option[String])
@@ -173,6 +176,7 @@ object Channel {
     case object GuildVoice extends Type(2)
     case object GroupDm extends Type(3)
     case object GuildCategory extends Type(4)
+    case class Unk(override val value: Int) extends Type(value)
   }
 }
 
@@ -202,6 +206,7 @@ object PermissionOverwrite {
     val values = findValues
     object Role extends Type("role")
     object Member extends Type("member")
+    case class Unk(override val value: String) extends Type(value)
   }
 }
 

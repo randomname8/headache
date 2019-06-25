@@ -53,12 +53,12 @@ object JsonCodecs {
     }
     override def writes(e: L Either R) = e.fold(Writes.of[L].writes, Writes.of[R].writes)
   }
-  implicit def intEnumPickler[T <: IntEnumEntry](implicit enum: IntEnum[T]): Format[T] = new Format[T] {
-    override def reads(jv: JsValue) = Reads.of[Int].map(enum.withValue).reads(jv)
+  def intEnumFormat[T <: IntEnumEntry](missingValue: Int => T)(implicit enum: IntEnum[T]): Format[T] = new Format[T] {
+    override def reads(jv: JsValue) = Reads.of[Int].map(v => enum.withValueOpt(v).getOrElse(missingValue(v))).reads(jv)
     override def writes(e: T) = JsNumber(e.value)
   }
-  implicit def stringEnumPickler[T <: StringEnumEntry](implicit enum: StringEnum[T]): Format[T] = new Format[T] {
-    override def reads(jv: JsValue) = Reads.of[String].map(enum.withValue).reads(jv)
+  def stringEnumFormat[T <: StringEnumEntry](missingValue: String => T)(implicit enum: StringEnum[T]): Format[T] = new Format[T] {
+    override def reads(jv: JsValue) = Reads.of[String].map(v => enum.withValueOpt(v).getOrElse(missingValue(v))).reads(jv)
     override def writes(e: T) = JsString(e.value)
   }
   
@@ -78,6 +78,7 @@ object JsonCodecs {
   implicit val guildMemberFormat: Format[GuildMember] = Json.format
   implicit val gameStatusTimestampsFormat: Format[GameStatus.Timestamps] = Json.format
   implicit val gameStatusAssetsFormat: Format[GameStatus.Assets] = Json.format
+  implicit val gameStatusTypeFormat: Format[GameStatus.Type] = intEnumFormat(GameStatus.Type.Unk)
   implicit val gameStatusFormat: Format[GameStatus] = Json.format
   implicit val guildUserFormat: Format[PresenceUser] = Json.format
   implicit val guildPresenceFormat: Format[GuildPresence] = Json.format
@@ -96,8 +97,12 @@ object JsonCodecs {
   implicit val embedFormat: Format[Embed] = Json.format
   implicit val messageFormat: Format[Message] = Json.format
   implicit val messageUpdateFormat: Format[MessageUpdate] = Json.format
+  implicit val notificationLevelFormat = intEnumFormat[NotificationLevel](NotificationLevel.Unk)
+  implicit val explicitContentFilterFormat = intEnumFormat[ExplicitContentFilterLevel](ExplicitContentFilterLevel.Unk)
   implicit val guildFormat: Format[Guild] = Json.format
+  implicit val permissionOverwriteType: Format[PermissionOverwrite.Type] = stringEnumFormat[PermissionOverwrite.Type](PermissionOverwrite.Type.Unk)
   implicit val overwriteFormat: Format[PermissionOverwrite] = Json.format
+  implicit val channelTypeFormat: Format[Channel.Type] = intEnumFormat[Channel.Type](Channel.Type.Unk)
   implicit val channelStateFormat: Format[Channel] = Json.format
   implicit val unavailableGuildFormat: Format[UnavailableGuild] = Json.format
   
