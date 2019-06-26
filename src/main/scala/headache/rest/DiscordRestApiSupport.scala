@@ -49,18 +49,19 @@ private[headache] trait DiscordRestApiSupport {
     }
     
     def createMessage(channelId: Snowflake, message: String, @Nullable embed: Embed = null, tts: Boolean = false,
-                      attachments: Array[Part] = Array.empty, progressListener: (Long, Long, Long) => Unit = (_, _, _) => ())(implicit s: BackPressureStrategy): Future[Message] = {
+                      @Nullable attachments: Array[Part] = null, @Nullable progressListener: (Long, Long, Long) => Any = null)(implicit s: BackPressureStrategy): Future[Message] = {
       val body = Json.obj("content" -> message, "nonce" -> (null: String), "tts" -> tts, "embed" -> Option(embed))
-      if (attachments.isEmpty)
+      val atts = Option(attachments).getOrElse(Array.empty)
+      if (atts.isEmpty)
         request(channelId.snowflakeString, extraPath = "/messages", method = "POST", body = body)(Json.parse(_).dyn.extract[Message])
       else {
         val base = baseRequest(channelId.snowflakeString)
         val reqBuilder = new RequestBuilder("POST").setUrl(base + "/messages").
         setHeaders(baseHeaders).addHeader("Content-Type", "multipart/form-data").
-        setBodyParts(Arrays.asList(attachments :+ new StringPart("payload_json", renderJson(body), "application/json", Charset.forName("utf-8")):_*))
+        setBodyParts(Arrays.asList(atts :+ new StringPart("payload_json", renderJson(body), "application/json", Charset.forName("utf-8")):_*))
       
         val req = reqBuilder.build()
-        request(base, req, Json.parse(_).dyn.extract[Message], 200, progressListener, s)
+        request(base, req, Json.parse(_).dyn.extract[Message], 200, Option(progressListener).getOrElse((_, _, _) => ()), s)
       }
     }
     def editMessage(channelId: Snowflake, messageId: Snowflake, @Nullable content: String = null,
@@ -202,7 +203,7 @@ private[headache] trait DiscordRestApiSupport {
       val req = reqBuilder.build()
       request(base, req, parser, expectedStatus, (_, _, _) => (), s)
     }
-    protected def request[T](baseToken: String, req: Request, parser: String => T, expectedStatus: Int, progressListener: (Long, Long, Long) => Unit, s: BackPressureStrategy): Future[T] = {
+    protected def request[T](baseToken: String, req: Request, parser: String => T, expectedStatus: Int, progressListener: (Long, Long, Long) => Any, s: BackPressureStrategy): Future[T] = {
       val res = rateLimitRegistry.rateLimitFor(baseToken) match {
         case Some(deadline) => Future.failed(RateLimitException(deadline.timeLeft))
         case _ => 
