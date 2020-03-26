@@ -17,8 +17,8 @@ import JsonUtils._
 private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
   import DiscordClient._
 
-  protected def startShard(gw: String, shard: Int, totalShards: Int, lastSession: Option[LastSessionState] = None): Future[GatewayConnection] = try {
-    val res = new GatewayConnectionImpl(gw, shard, totalShards, lastSession)
+  protected def startShard(gw: String, shard: Int, totalShards: Int, desiredEvents: Set[GatewayEvents.Intent], lastSession: Option[LastSessionState] = None): Future[GatewayConnection] = try {
+    val res = new GatewayConnectionImpl(gw, shard, totalShards, desiredEvents, lastSession)
     val websocketFuture = ahc.prepareGet(gw).execute(new ws.WebSocketUpgradeHandler(Arrays.asList(res)))
     val ready = Promise[GatewayConnection]()
     websocketFuture.toCompletableFuture.handle[Unit] {
@@ -34,13 +34,28 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
   protected case class SessionData(id: String, gatewayProtocol: Int)
   protected case class LastSessionState(data: SessionData, seq: Long, connectionAttempt: Int)
   protected final class GatewayConnectionImpl(val gateway: String, val shardNumber: Int, val totalShards: Int,
-      lastSession: Option[LastSessionState]) extends GatewayConnection with ws.WebSocketListener {
+      desiredEvents: Set[GatewayEvents.Intent], lastSession: Option[LastSessionState]) extends GatewayConnection with ws.WebSocketListener {
     @volatile private[this] var active = true
     @volatile private[this] var websocket: ws.WebSocket = _
     @volatile private[this] var seq = 0L
     @volatile private[this] var session: Option[SessionData] = None
     private[this] var missedHeartbeats = 0
 
+    private[this] def listenerReporting(f: => Unit) = 
+      try f
+      catch { 
+        case NonFatal(e) => reportError(e)
+      }
+    private[this] def reportError(e: Throwable) = try listener.onConnectionError(this, e) catch { case NonFatal(e2) => 
+      val baos = new java.io.ByteArrayOutputStream(1024*5)
+      val ps = new java.io.PrintStream(baos, true, "utf-8")
+      ps.println("Error reporting to listener\n")
+      e.addSuppressed(e2)
+      e.printStackTrace(ps)
+      ps.flush()
+      System.out.write(baos.toByteArray)
+    }
+    
     override def isActive = active
     override def close() = if (active && websocket != null) {
       active = false
@@ -49,7 +64,7 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
 
     override def onOpen(w: ws.WebSocket): Unit = {
       websocket = w
-      listener.onConnectionOpened(this)
+      listenerReporting(listener.onConnectionOpened(this))
     }
 //    override def onClose(w: ws.WebSocket): Unit = if (isActive) {
 //      websocket = null
@@ -59,7 +74,7 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
     override def onClose(w: ws.WebSocket, code: Int, reason: String): Unit = if (isActive) { //after a break down, netty will eventually realize that the socket broke, and even though we already called websocket.close(), it will eventually invoke this method.
       websocket = null
       if (active) { //if we are no longer active, it means the close() method was called, and so we must not reconnect
-        listener.onDisconnected(this, code, reason)
+        listenerReporting(listener.onDisconnected(this, code, reason))
         reconnect(DisconnectedByServer)
       }
       active = false //we are not active anymore after this step
@@ -68,7 +83,7 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
 
     /**
      * **************************************************
-     * Definition of possible states for the connection *
+     * Definition of possible states for the gateway    *
      * **************************************************
      */
 
@@ -87,7 +102,8 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
 //                                        ("$referring_domain" -> "") ~
 //                                        ("$referrer" -> "")*/
             "compress" -> false,
-            "large_threshold" -> 50
+            "large_threshold" -> 50,
+            "intents" -> desiredEvents.map(e => 1 << GatewayEvents.Intent.indexOf(e)).reduce(_|_)
           ) ++ ( if (totalShards > 1) Json.obj("shard" -> Seq(shardNumber, totalShards)) else Json.obj())
         )
       }
@@ -115,7 +131,7 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
           dispatcher
 
         case GatewayMessage(GatewayOp.InvalidSession, _, _) =>
-          listener.onConnectionError(GatewayConnectionImpl.this, new IllegalStateException("Received an invalid session after sending identification.") with NoStackTrace)
+          reportError(new IllegalStateException("Received an invalid session after sending identification.") with NoStackTrace)
           close()
           done
       }
@@ -137,11 +153,11 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
 
       def dispatcher: Transition = transition {
         case GatewayMessage(GatewayOp.Dispatch, Some(tpe), payload) =>
-          try {
+          listenerReporting {
             listener.onGatewayEvent(GatewayConnectionImpl.this)(GatewayEvents.GatewayEvent(
               GatewayEvents.EventType.withValueOpt(tpe).getOrElse(GatewayEvents.EventType.Unknown), payload
             ))
-          } catch { case NonFatal(e) => listener.onConnectionError(GatewayConnectionImpl.this, e) }
+          }
           dispatcher
         case GatewayMessage(GatewayOp.Reconnect, _, _) =>
           reconnect(RequestedByServer)
@@ -149,7 +165,7 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
       }
     }
 
-    override def onError(ex: Throwable): Unit = listener.onConnectionError(this, Option(ex) getOrElse new RuntimeException("Something went wrong but we got null throwable?"))
+    override def onError(ex: Throwable): Unit = reportError(Option(ex) getOrElse new RuntimeException("Something went wrong but we got null throwable?"))
     override def onTextFrame(msg: String, finalFragment: Boolean, rsv: Int): Unit = {
       //do basic stream parsing to obtain general headers, the idea is to avoid computation as much as possible here.
 
@@ -188,10 +204,9 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
 
         s foreach (seq = _)
         GatewayOp.withValueOpt(op).fold {
-          listener.onUnexpectedGatewayOp(this, op, payload)
+          listenerReporting(listener.onUnexpectedGatewayOp(this, op, payload))
         } { op =>
-
-          listener.onGatewayOp(this, op, payload)
+          listenerReporting(listener.onGatewayOp(this, op, payload))
           stateMachine.orElse[GatewayMessage, Unit] {
             case GatewayMessage(GatewayOp.Heartbeat, _, _) => send(renderJson(Json.obj("op" -> GatewayOp.Heartbeat.value, "d" -> seq)))
             case GatewayMessage(GatewayOp.Dispatch, _, _) =>
@@ -199,7 +214,7 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
           }.apply(GatewayMessage(op, tpe, () => payload))
         }
 
-      } catch { case NonFatal(e) => listener.onConnectionError(this, e) }
+      } catch { case NonFatal(e) => reportError(e) }
     }
     
     private[this] val accumulatedCompressedChunks = new collection.mutable.ArrayBuffer[Array[Byte]](10)
@@ -223,7 +238,7 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
 
     def send(msg: String) = {
       if (!active) throw new IllegalStateException(s"Shard $shardNumber is closed!")
-      listener.onMessageBeingSent(this, msg)
+      listenerReporting(listener.onMessageBeingSent(this, msg))
       websocket.sendTextFrame(msg)
     }
 
@@ -269,7 +284,7 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
           val timeout = timer.newTimeout({ timeout =>
             if (!timeout.isCancelled && isActive) {
               missedHeartbeats += 1
-              listener.onHeartbeatMissed(this, missedHeartbeats)
+              listenerReporting(listener.onHeartbeatMissed(this, missedHeartbeats))
               reconnect(HeartbeatMissed)
             }
           }, heartbeatTimeout, SECONDS)
@@ -291,12 +306,14 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
 
     def reconnect(reason: ReconnectReason): Unit = {
       if (websocket != null && active) websocket.sendCloseFrame()
-      listener.onReconnecting(this, reason)
+      active = false //this gatewayconnection is no longer valid
+      listenerReporting(listener.onReconnecting(this, reason))
       val reconnectInstance = if (session.isDefined) 0 else lastSession.map(_.connectionAttempt + 1).getOrElse(0)
       val newLastSession = session.map(s => LastSessionState(s, seq, reconnectInstance))
       def reconnectAttempt(duration: FiniteDuration): Unit = {
         timer.newTimeout(_ =>
-          startShard(gateway, shardNumber, totalShards, newLastSession).failed.foreach(_ => reconnectAttempt(5.seconds)), duration.length, duration.unit
+          startShard(gateway, shardNumber, totalShards, desiredEvents, newLastSession).failed.foreach(_ => reconnectAttempt(5.seconds)),
+          duration.length, duration.unit
         )
       }
       if (reconnectInstance > 0) reconnectAttempt(5.seconds)

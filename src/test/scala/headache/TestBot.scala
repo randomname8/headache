@@ -9,7 +9,7 @@ import GatewayEvents._
 object TestBot {
 
   def main(args: Array[String]): Unit = {
-    val token = file"test-token".contentAsString()
+    val token = File("test-token").contentAsString()
     
     val client = new DiscordClient(token, new DiscordClient.DiscordListener {
         def prettyPrint(js: DynJValueSelector) = JsonUtils.renderJson(js.jv.result.get, true)
@@ -87,6 +87,9 @@ object TestBot {
           case VoiceServerUpdateEvent(evt) => println(AnsiColor.YELLOW + evt + AnsiColor.RESET)
         }}
       })
-    client.login().onComplete(println)
+    client.login(Set(
+      GatewayEvents.Intent.Guilds,
+      GatewayEvents.Intent.GuildMessages,
+    )).onComplete(println)
   }
 }

@@ -18,6 +18,7 @@ object JsonUtils {
   }
   class DynJValueSelector(val jv: JsLookupResult) extends AnyVal with Dynamic {
     def selectDynamic(field: String) = new DynJValueSelector(jv \ field)
+    def applyDynamic(field: String)(i: Int) = new DynJValueSelector((jv \ field).as[JsArray].apply(i).result)
     def extract[T](implicit read: Reads[T]): T = jv.validate[T].asEither.fold(err => throw new NoSuchElementException(err.toString), identity)
     override def toString = jv.toString
   }

@@ -21,12 +21,12 @@ class DiscordClient(val token: String, val listener: DiscordClient.DiscordListen
     },
     5, MILLISECONDS
   )
-  def login(preferredShards: Option[Int] = None): Future[Seq[GatewayConnection]] = {
+  def login(desiredEvents: Set[GatewayEvents.Intent], preferredShards: Option[Int] = None): Future[Seq[GatewayConnection]] = {
     fetchGateway flatMap {
       case (gw, shards) =>
         val expectedShards = preferredShards getOrElse shards
 
-        Future sequence (for (s <- 0 until expectedShards) yield startShard(gw, s, expectedShards))
+        Future sequence (for (s <- 0 until expectedShards) yield startShard(gw, s, expectedShards, desiredEvents))
     }
   }
   def close(): Unit = {

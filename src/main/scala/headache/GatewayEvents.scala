@@ -1,5 +1,6 @@
 package headache
 
+import enumeratum.{Enum, EnumEntry}
 import enumeratum.values._
 import java.time.Instant
 import play.api.libs.json.{JsLookupResult, Json, JsSuccess, JsError}
@@ -207,4 +208,23 @@ object GatewayEvents {
   case class VoiceServerUpdate(guildId: Snowflake, token: String, endpoint: Option[String] = None)
   object VoiceServerUpdateEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.VoiceServerUpdate) Some(ge.payloadAs_![VoiceServerUpdate]) else None }
 
+
+  sealed trait Intent extends EnumEntry
+  object Intent extends Enum[Intent] {
+    val values = findValues
+    case object Guilds extends Intent
+    case object GuildMembers extends Intent
+    case object GuildBans extends Intent
+    case object GuildEmojis extends Intent
+    case object GuildIntegrations extends Intent
+    case object GuildWebhooks extends Intent
+    case object GuildInvites extends Intent
+    case object GuildVoiceStates extends Intent
+    case object GuildPresences extends Intent
+    case object GuildMessages extends Intent
+    case object GuildMessageReactions extends Intent
+    case object GuildMessageTypings extends Intent
+    case object DirectMessageReactions extends Intent
+    case object DirectMessageTypings extends Intent
+  }
 }
