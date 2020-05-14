@@ -224,6 +224,7 @@ object GatewayEvents {
     case object GuildMessages extends Intent
     case object GuildMessageReactions extends Intent
     case object GuildMessageTypings extends Intent
+    case object DirectMessages extends Intent
     case object DirectMessageReactions extends Intent
     case object DirectMessageTypings extends Intent
   }
