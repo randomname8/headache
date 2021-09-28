@@ -19,7 +19,10 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
 
   protected def startShard(gw: String, shard: Int, totalShards: Int, desiredEvents: Set[GatewayEvents.Intent], lastSession: Option[LastSessionState] = None): Future[GatewayConnection] = try {
     val res = new GatewayConnectionImpl(gw, shard, totalShards, desiredEvents, lastSession)
-    val websocketFuture = ahc.prepareGet(gw).execute(new ws.WebSocketUpgradeHandler(Arrays.asList(res)))
+    val websocketFuture = ahc.prepareGet(gw).
+      addHeader("Origin", null: String).
+      execute(new ws.WebSocketUpgradeHandler(Arrays.asList(res)))
+
     val ready = Promise[GatewayConnection]()
     websocketFuture.toCompletableFuture.handle[Unit] {
       case (_, null) =>
@@ -101,7 +104,7 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
             ),
 //                                        ("$referring_domain" -> "") ~
 //                                        ("$referrer" -> "")*/
-            "compress" -> false,
+            "compress" -> true,
             "large_threshold" -> 50,
             "intents" -> desiredEvents.map(e => 1 << GatewayEvents.Intent.indexOf(e)).reduce(_|_)
           ) ++ ( if (totalShards > 1) Json.obj("shard" -> Seq(shardNumber, totalShards)) else Json.obj())
@@ -242,22 +245,23 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
       websocket.sendTextFrame(msg)
     }
 
-    def gatewayMessage(op: IntEnumEntry, data: JsValue, eventType: Option[String] = None): JsValue = Json.obj(
+    def gatewayMessage(op: IntEnumEntry, data: JsValue): JsValue = Json.obj(
       "op" -> op.value,
-      "s" -> seq,
       "d" -> data
-    ) ++ eventType.fold(Json.obj())(t => Json.obj("t" -> t))
+    )
 
-    override def sendStatusUpdate(idleSince: Option[Instant], status: Status): Unit = {
+    override def sendStatusUpdate(idleSince: Option[Instant], status: PresenceState, game: Activity, afk: Boolean): Unit = {
+      import JsonCodecs.activityFormat
       send(renderJson(
           gatewayMessage(
             GatewayOp.StatusUpdate,
-            Json.obj("idle_since" -> idleSince.map(e => Json  toJsFieldJsValueWrapper e.toEpochMilli).getOrElse(JsNull),
-                     "game" -> (status match {
-                  case Status.PlayingGame(game) => Json.obj("name" -> game)
-                  case Status.Streaming(name, url) => Json.obj("name" -> name, "url" -> url)
-                  case Status.Empty => null
-                })), Some("STATUS_UPDATE"))
+            Json.obj(
+              "since" -> idleSince.map(e => Json toJsFieldJsValueWrapper e.toEpochMilli).getOrElse(JsNull),
+              "game" -> game,
+              "status" -> status.value,
+              "afk" -> afk
+            )
+          )
         ))
     }
     override def sendRequestGuildMembers(guildId: Snowflake, query: String = "", limit: Int = 0): Unit = {
@@ -268,7 +272,7 @@ private[headache] trait GatewayConnectionSupport { self: DiscordClient =>
     override def sendVoiceStateUpdate(guildId: Snowflake, channelId: Option[Snowflake], selfMute: Boolean, selfDeaf: Boolean): Unit = {
       send(renderJson(
           gatewayMessage(GatewayOp.VoiceStateUpdate, Json.obj("guild_id" -> guildId.snowflakeString, "self_mute" -> selfMute, "self_deaf" -> selfDeaf,
-                                                              "channel_id" -> channelId.map(_.snowflakeString)), Some("VOICE_STATE_UPDATE"))
+                                                              "channel_id" -> channelId.map(_.snowflakeString)))
       ))
     }
 

@@ -22,7 +22,7 @@ class DiscordClient(val token: String, val listener: DiscordClient.DiscordListen
     5, MILLISECONDS
   )
   def login(desiredEvents: Set[GatewayEvents.Intent], preferredShards: Option[Int] = None): Future[Seq[GatewayConnection]] = {
-    fetchGateway flatMap {
+    fetchGateway() flatMap {
       case (gw, shards) =>
         val expectedShards = preferredShards getOrElse shards
 
@@ -36,7 +36,7 @@ class DiscordClient(val token: String, val listener: DiscordClient.DiscordListen
   def fetchGateway(): Future[(String, Int)] = request(ahc.prepareGet(GATEWAY).setHeaders(baseHeaders))(
     asDynJson.andThen { jv =>
       listener.onGatewayData(jv)
-      (jv.url.extract[String] + "?encoding=json&v=6&compress=zlib-stream", jv.shards.extract)
+      (jv.url.extract[String] + "?encoding=json&v=9&compress=zlib-stream", jv.shards.extract)
     }
   )
 
@@ -70,7 +70,7 @@ class DiscordClient(val token: String, val listener: DiscordClient.DiscordListen
     def shardNumber: Int
     def totalShards: Int
 
-    def sendStatusUpdate(idleSince: Option[Instant], status: Status): Unit
+    def sendStatusUpdate(idleSince: Option[Instant], status: PresenceState, game: Activity, afk: Boolean): Unit
     def sendVoiceStateUpdate(guildId: Snowflake, channelId: Option[Snowflake], selfMute: Boolean, selfDeaf: Boolean): Unit
     def sendRequestGuildMembers(guildId: Snowflake, query: String = "", limit: Int = 0): Unit
   }

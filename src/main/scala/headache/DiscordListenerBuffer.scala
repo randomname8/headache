@@ -38,5 +38,5 @@ class DiscordListenerBuffer(queueSize: Int = 1000/*, var logOutgoingGatewayMessa
 
   def remaining = queue.size()
   def iterator = queue.iterator.asScala
-  def consumingIterator = Iterator.continually(pop).takeWhile(_ != null)
+  def consumingIterator = Iterator.continually(queue.poll()).takeWhile(_ != null)
 }

@@ -57,7 +57,7 @@ object GatewayEvents {
     }
   }
   class GatewayEventParsingError(payload: JsLookupResult, expectedType: Manifest[_], parseError: JsError) extends RuntimeException(
-    s"Failed to parse $expectedType from payload \n${Json prettyPrint payload.get}\n")
+    s"Failed to parse $expectedType from payload \n${Json prettyPrint payload.get}:\n:$parseError")
   
   case class ReadState(id: Snowflake, lastMessageId: Option[Snowflake] = None, mentionCount: Option[Int] = None)
   case class Ready(
@@ -159,7 +159,7 @@ object GatewayEvents {
 
   case class MessageCreate(message: Message)
   object MessageCreateEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.MessageCreate) Some(MessageCreate(ge.payloadAs_!)) else None }
-  case class MessageUpdate(message: headache.MessageUpdate)
+  case class MessageUpdate(message: Message)
   object MessageUpdateEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.MessageUpdate) Some(GatewayEvents.MessageUpdate(ge.payloadAs_!)) else None }
   case class MessageDelete(channelId: Snowflake, id: String)
   object MessageDeleteEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.MessageDelete) Some(ge.payloadAs_![MessageDelete]) else None }
@@ -178,7 +178,7 @@ object GatewayEvents {
     user: PresenceUser,
     nick: Option[String] = None,
     roles: Array[Snowflake] = Array.empty,
-    game: Option[GameStatus] = None,
+    game: Option[Activity] = None,
     status: String
   )
   object PresenceUpdateEvent { def unapply(ge: GatewayEvent) = if (ge.tpe == EventType.PresenceUpdate) Some(ge.payloadAs_![PresenceUpdate]) else None }

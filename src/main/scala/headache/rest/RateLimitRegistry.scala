@@ -18,14 +18,14 @@ class RateLimitRegistry {
   def rateLimitFor(token: Any): Option[Deadline] = atomic { implicit txn =>
     globalRateLimit() match {
       case None => tryRateLimit(token)
-      case Some(rl) if rl.isOverdue =>
+      case Some(rl) if rl.isOverdue() =>
         globalRateLimit() = None
         tryRateLimit(token)
       case other => other
     }
   }
   private[this] def tryRateLimit(token: Any)(implicit trn: InTxn) = rateLimits.get(token) match {
-    case Some(rl) if rl.isOverdue =>
+    case Some(rl) if rl.isOverdue() =>
       rateLimits.remove(token)
       None
     case other => other

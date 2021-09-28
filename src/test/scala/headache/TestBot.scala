@@ -2,7 +2,7 @@ package headache
 
 import better.files._
 import scala.io.AnsiColor
-import scala.concurrent._, ExecutionContext.Implicits._
+import scala.concurrent._, duration._, ExecutionContext.Implicits._
 import JsonUtils._
 import GatewayEvents._
 
@@ -10,11 +10,15 @@ object TestBot {
 
   def main(args: Array[String]): Unit = {
     val token = File("test-token").contentAsString()
+    System.setProperty("org.slf4j.simpleLogger.log.org.asynchttpclient", "debug")
     
     val client = new DiscordClient(token, new DiscordClient.DiscordListener {
         def prettyPrint(js: DynJValueSelector) = JsonUtils.renderJson(js.jv.result.get, true)
-//        override def onGatewayOp(connection: DiscordClient#GatewayConnection, op: GatewayOp, data: => DynJValueSelector): Unit = 
-//          println(AnsiColor.BLUE + s"op: $op data: ${prettyPrint(data)}" + AnsiColor.RESET)
+
+        override def onGatewayData(data: => JsonUtils.DynJValueSelector): Unit = 
+          println(AnsiColor.BLUE + prettyPrint(data) + AnsiColor.RESET)
+        // override def onGatewayOp(connection: DiscordClient#GatewayConnection, op: GatewayOp, data: => DynJValueSelector): Unit = 
+        //   println(AnsiColor.BLUE + s"op: $op data: ${prettyPrint(data)}" + AnsiColor.RESET)
         override def onVoiceOp(connection: DiscordClient#VoiceConnection, op: VoiceOp, data: => DynJValueSelector): Unit =
           println(AnsiColor.MAGENTA + s"voice op: $op data: ${prettyPrint(data)}" + AnsiColor.RESET)
         override def onUnexpectedGatewayOp(connection: DiscordClient#GatewayConnection, op: Int, data: => DynJValueSelector): Unit =
@@ -33,12 +37,12 @@ object TestBot {
         override def onDisconnected(connection: DiscordClient#Connection, code: Int, reason: String): Unit =
           println(AnsiColor.RED + s"disconnected $connection code: $code reason: $reason" + AnsiColor.RESET)
         override def onConnectionError(connection: DiscordClient#Connection, error: Throwable): Unit = {
-          val stacktrace = Iterator.iterate(error)(_.getCause).takeWhile(_ != null).foldLeft(new StringBuilder){ (sb, ex) =>
+          val stacktrace = Iterator.iterate(error)(_.getCause).takeWhile(_ != null).foldLeft(new StringBuilder()){ (sb, ex) =>
             sb.append("caused by: ").append(ex)
             ex.getStackTrace foreach (t => sb.append("\n  ").append(t))
             sb
           }.result
-          println(AnsiColor.RED_B + AnsiColor.WHITE + s"connection error $connection $stacktrace" + AnsiColor.RESET)
+          println(AnsiColor.RED_B + s"connection error $connection $stacktrace" + AnsiColor.RESET)
         }
       
         val totalUsers = new java.util.concurrent.atomic.AtomicInteger
@@ -46,7 +50,7 @@ object TestBot {
           case ReadyEvent(evt) =>
             println(AnsiColor.YELLOW + evt + AnsiColor.RESET)
             val guilds = evt.guilds.collect { case Right(g) => g }
-            println(System.currentTimeMillis + " requesting guilds " + guilds.map(_.name).mkString(", "))
+            println(s"${System.currentTimeMillis} requesting guilds " + guilds.map(_.name).mkString(", "))
             guilds foreach (g => connection.sendRequestGuildMembers(g.id, "", 0))
             
           case Resumed(()) => println(AnsiColor.YELLOW + "resumed" + AnsiColor.RESET)
@@ -87,9 +91,14 @@ object TestBot {
           case VoiceServerUpdateEvent(evt) => println(AnsiColor.YELLOW + evt + AnsiColor.RESET)
         }}
       })
-    client.login(Set(
+    val gw = Await.result(client.login(Set(
       GatewayEvents.Intent.Guilds,
       GatewayEvents.Intent.GuildMessages,
-    )).onComplete(println)
+    )), 5.seconds).head
+
+    println(s"logged in $gw")
+    Thread.sleep(10000)
+    println("changing status")
+    gw.sendStatusUpdate(None, PresenceState.Dnd, Status.Empty, false)
   }
 }

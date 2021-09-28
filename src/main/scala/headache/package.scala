@@ -5,4 +5,11 @@ package object headache {
     def snowflakeString = java.lang.Long.toUnsignedString(v)
   }
   final val NoSnowflake = Snowflake.NoSnowflake
+
+
+  type PermissionBits = Long with Tag[PermissionBits.type]
+  
+  implicit class PermissionBitsOps(private val v: PermissionBits) extends AnyVal {
+    def asPermissionsString: String = java.lang.Long.toUnsignedString(v)
+  }
 }

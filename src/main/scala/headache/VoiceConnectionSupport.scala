@@ -37,8 +37,8 @@ private[headache] trait VoiceConnectionSupport { self: DiscordClient =>
     override def onOpen(w: ws.WebSocket): Unit = {
       websocket = w
       listener.onConnectionOpened(this)
-      send(renderJson(gatewayMessage(VoiceOp.Identify, Json.obj("server_id" -> voiceServerUpdate.guildId,
-        "user_id" -> voiceStateUpdate.voiceState.userId,
+      send(renderJson(gatewayMessage(VoiceOp.Identify, Json.obj("server_id" -> voiceServerUpdate.guildId.snowflakeString,
+        "user_id" -> voiceStateUpdate.voiceState.userId.snowflakeString,
         "session_id" -> voiceStateUpdate.sessionId,
         "token" -> voiceServerUpdate.token))))
     }

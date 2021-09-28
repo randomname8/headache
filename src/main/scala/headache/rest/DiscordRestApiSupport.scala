@@ -28,12 +28,12 @@ private[headache] trait DiscordRestApiSupport {
   object channels extends Endpoint {
     def baseRequest(channelId: String) = s"https://discordapp.com/api/channels/${channelId}"
     
-    def get(channelId: Snowflake)(implicit s: BackPressureStrategy): Future[Channel] = request(channelId.snowflakeString)(Json.parse(_).dyn.extract[Channel])
+    def get(channelId: Snowflake)(implicit s: BackPressureStrategy): Future[Channel] = request(channelId.snowflakeString)(Json.parse(_).as[Channel])
     def modify(channel: Channel)(implicit s: BackPressureStrategy): Future[Unit] = request(channel.id.snowflakeString, method = "PATCH", body = toJson(channel), expectedStatus = 201)(unit)
     def delete(channelId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] = request(channelId.snowflakeString, method = "DELETE")(unit)
     
     def getMessage(channelId: Snowflake, messageId: Snowflake)(implicit s: BackPressureStrategy): Future[Message] = 
-      request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}")(Json.parse(_).dyn.extract[Message])
+      request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}")(Json.parse(_).as[Message])
     
     def ack(channelId: Snowflake, messageId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] = {
       val body = Json.obj("manual" -> true)
@@ -45,7 +45,7 @@ private[headache] trait DiscordRestApiSupport {
       require(around != NoSnowflake || before != NoSnowflake || after != NoSnowflake, "one of 'around', 'before' or 'after' must be specified (i.e different from NoSnowflake)")
       val params = Seq("limit" -> limit.toString) ++ optSnowflake(around).map("around" -> _.snowflakeString) ++ 
       optSnowflake(before).map("before" -> _.snowflakeString) ++ optSnowflake(after).map("after" -> _.snowflakeString)
-      request(channelId.snowflakeString, extraPath = "/messages", queryParams = params.toSeq)(Json.parse(_).dyn.extract[Seq[Message]])
+      request(channelId.snowflakeString, extraPath = "/messages", queryParams = params.toSeq)(Json.parse(_).as[Seq[Message]])
     }
     
     def createMessage(channelId: Snowflake, message: String, @Nullable embed: Embed = null, tts: Boolean = false,
@@ -53,7 +53,7 @@ private[headache] trait DiscordRestApiSupport {
       val body = Json.obj("content" -> message, "nonce" -> (null: String), "tts" -> tts, "embed" -> Option(embed))
       val atts = Option(attachments).getOrElse(Array.empty)
       if (atts.isEmpty)
-        request(channelId.snowflakeString, extraPath = "/messages", method = "POST", body = body)(Json.parse(_).dyn.extract[Message])
+        request(channelId.snowflakeString, extraPath = "/messages", method = "POST", body = body)(Json.parse(_).as[Message])
       else {
         val base = baseRequest(channelId.snowflakeString)
         val reqBuilder = new RequestBuilder("POST").setUrl(base + "/messages").
@@ -61,14 +61,14 @@ private[headache] trait DiscordRestApiSupport {
         setBodyParts(Arrays.asList(atts :+ new StringPart("payload_json", renderJson(body), "application/json", Charset.forName("utf-8")):_*))
       
         val req = reqBuilder.build()
-        request(base, req, Json.parse(_).dyn.extract[Message], 200, Option(progressListener).getOrElse((_, _, _) => ()), s)
+        request(base, req, Json.parse(_).as[Message], 200, Option(progressListener).getOrElse((_, _, _) => ()), s)
       }
     }
     def editMessage(channelId: Snowflake, messageId: Snowflake, @Nullable content: String = null,
                     @Nullable embed: Embed = null)(implicit s: BackPressureStrategy): Future[Message] = {
       require(content != null || embed != null, "content and embed cant both be null")
       val body = Json.obj("content" -> Option(content), "embed" -> Option(embed))
-      request(channelId.snowflakeString, extraPath = "/messages", method = "PATCH", body = body)(Json.parse(_).dyn.extract[Message])
+      request(channelId.snowflakeString, extraPath = "/messages", method = "PATCH", body = body)(Json.parse(_).as[Message])
     }
     def deleteMessage(channelId: Snowflake, messageId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
       request(channelId.snowflakeString, extraPath = "/messages", method = "DELETE", expectedStatus = 204)(unit)
@@ -86,7 +86,7 @@ private[headache] trait DiscordRestApiSupport {
     def getReactions(channelId: Snowflake, messageId: Snowflake, emoji: String, before: Snowflake = NoSnowflake,
                      after: Snowflake = NoSnowflake, limit: Int = 100)(implicit s: BackPressureStrategy): Future[Seq[User]] = {
       val params = Seq("limit" -> limit.toString) ++ optSnowflake(before).map("before" -> _.snowflakeString) ++ optSnowflake(after).map("after" -> _.snowflakeString)
-      request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}/reactions/$emoji", queryParams = params)(Json.parse(_).dyn.extract[Seq[User]])
+      request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}/reactions/$emoji", queryParams = params)(Json.parse(_).as[Seq[User]])
     }
     def deleteAllReactions(channelId: Snowflake, messageId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] = 
       request(channelId.snowflakeString, extraPath = s"/messages/${messageId.snowflakeString}/reactions", method = "DELETE", expectedStatus = 204)(unit)
@@ -107,7 +107,7 @@ private[headache] trait DiscordRestApiSupport {
       request(channelId.snowflakeString, extraPath = "/typing", method = "POST", expectedStatus = 204)(unit)
     
     def getPinnedMessages(channelId: Snowflake)(implicit s: BackPressureStrategy): Future[Seq[Message]] =
-      request(channelId.snowflakeString, extraPath = "/pins")(Json.parse(_).dyn.extract[Seq[Message]])
+      request(channelId.snowflakeString, extraPath = "/pins")(Json.parse(_).as[Seq[Message]])
     def addPinnedChannelMessage(channelId: Snowflake, messageId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
       request(channelId.snowflakeString, extraPath = s"/pins/${messageId.snowflakeString}", method = "PUT", expectedStatus = 204)(unit)
     def deletePinnedChannelMessage(channelId: Snowflake, messageId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
@@ -123,16 +123,16 @@ private[headache] trait DiscordRestApiSupport {
   object guilds extends Endpoint {
     def baseRequest(guildId: String) = s"https://discordapp.com/api/guilds/${guildId}"
     
-    def get(guildId: Snowflake)(implicit s: BackPressureStrategy): Future[Guild] = request(guildId.snowflakeString)(Json.parse(_).dyn.extract[Guild])
+    def get(guildId: Snowflake)(implicit s: BackPressureStrategy): Future[Guild] = request(guildId.snowflakeString)(Json.parse(_).as[Guild])
     def modify(guildId: Snowflake, modification: GuildModification)(implicit s: BackPressureStrategy): Future[Guild] = 
-      request(guildId.snowflakeString, method = "PATCH", body = Json.toJson(modification))(Json.parse(_).dyn.extract[Guild])
+      request(guildId.snowflakeString, method = "PATCH", body = Json.toJson(modification))(Json.parse(_).as[Guild])
     def delete(guildId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
       request(guildId.snowflakeString, method = "DELETE", expectedStatus = 204)(unit)
     
     def getChannels(guildId: Snowflake)(implicit s: BackPressureStrategy): Future[Seq[Channel]] =
-      request(guildId.snowflakeString, extraPath = "/channels")(Json.parse(_).dyn.extract[Seq[Channel]])
+      request(guildId.snowflakeString, extraPath = "/channels")(Json.parse(_).as[Seq[Channel]])
     def createChannel(guildId: Snowflake, channel: GuildChannelCreationParams)(implicit s: BackPressureStrategy): Future[Channel] =
-      request(guildId.snowflakeString, extraPath = "/channels", method = "POST", body = Json.toJson(channel))(Json.parse(_).dyn.extract[Channel])
+      request(guildId.snowflakeString, extraPath = "/channels", method = "POST", body = Json.toJson(channel))(Json.parse(_).as[Channel])
     def modifyChannelPositions(guildId: Snowflake, channelId: Snowflake, position: Int)(implicit s: BackPressureStrategy): Future[Unit] =
       request(guildId.snowflakeString, extraPath = "/channels", method = "PATCH",
               body = Json.obj("id" -> channelId.snowflakeString, "position" -> position), expectedStatus = 204)(unit)
@@ -149,25 +149,25 @@ private[headache] trait DiscordRestApiSupport {
     
     
     def getBans(guildId: Snowflake)(implicit s: BackPressureStrategy): Future[Seq[Ban]] =
-      request(guildId.snowflakeString, extraPath = "/bans")(Json.parse(_).dyn.extract[Seq[Ban]])
+      request(guildId.snowflakeString, extraPath = "/bans")(Json.parse(_).as[Seq[Ban]])
     def getBan(guildId: Snowflake, userId: Snowflake)(implicit s: BackPressureStrategy): Future[Ban] =
-      request(guildId.snowflakeString, extraPath = s"/bans/${userId.snowflakeString}")(Json.parse(_).dyn.extract[Ban])
+      request(guildId.snowflakeString, extraPath = s"/bans/${userId.snowflakeString}")(Json.parse(_).as[Ban])
     def createBan(guildId: Snowflake, userId: Snowflake, deleteMessageDays: Int, reason: String)(implicit s: BackPressureStrategy): Future[Ban] =
       request(guildId.snowflakeString, extraPath = s"/bans/${userId.snowflakeString}",
-              queryParams = Seq("delete-message-days" -> deleteMessageDays.toString, "reason" -> reason))(Json.parse(_).dyn.extract[Ban])
+              queryParams = Seq("delete-message-days" -> deleteMessageDays.toString, "reason" -> reason))(Json.parse(_).as[Ban])
     def removeBan(guildId: Snowflake, userId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
       request(guildId.snowflakeString, extraPath = s"/bans/${userId.snowflakeString}", method = "DELETE")(unit)
     
     def getRoles(guildId: Snowflake)(implicit s: BackPressureStrategy): Future[Seq[Role]] =
-      request(guildId.snowflakeString, extraPath = "/roles")(Json.parse(_).dyn.extract[Seq[Role]])
+      request(guildId.snowflakeString, extraPath = "/roles")(Json.parse(_).as[Seq[Role]])
     def createRole(guildId: Snowflake, params: GuildRoleCreationParams)(implicit s: BackPressureStrategy): Future[Role] =
-      request(guildId.snowflakeString, extraPath = "/roles", method = "POST", body = Json.toJson(params))(Json.parse(_).dyn.extract[Role])
+      request(guildId.snowflakeString, extraPath = "/roles", method = "POST", body = Json.toJson(params))(Json.parse(_).as[Role])
     def modifyRolePositions(guildId: Snowflake, roleId: Snowflake, position: Int)(implicit s: BackPressureStrategy): Future[Role] =
       request(guildId.snowflakeString, extraPath = "/roles", method = "PATCH",
-              queryParams = Seq("id" -> roleId.snowflakeString, "position" -> position.toString))(Json.parse(_).dyn.extract[Role])
+              queryParams = Seq("id" -> roleId.snowflakeString, "position" -> position.toString))(Json.parse(_).as[Role])
     def modifyRole(guildId: Snowflake, roleId: Snowflake, params: GuildRoleCreationParams)(implicit s: BackPressureStrategy): Future[Role] =
       request(guildId.snowflakeString, extraPath = s"/roles/${roleId.snowflakeString}", method = "PATCH",
-              body = Json.toJson(params))(Json.parse(_).dyn.extract[Role])
+              body = Json.toJson(params))(Json.parse(_).as[Role])
     def deleteRole(guildId: Snowflake, roleId: Snowflake)(implicit s: BackPressureStrategy): Future[Unit] =
       request(guildId.snowflakeString, extraPath = s"/roles/${roleId.snowflakeString}", method = "DELETE", expectedStatus = 204)(unit)
   }
@@ -176,11 +176,11 @@ private[headache] trait DiscordRestApiSupport {
     private val self = "@me"
     def baseRequest(userId: String) = s"https://discordapp.com/api/users/${userId}"
     
-    def currentUser()(implicit s: BackPressureStrategy): Future[User] = request(self)(Json.parse(_).dyn.extract[User])
-    def user(id: Snowflake)(implicit s: BackPressureStrategy) = request(id.snowflakeString)(Json.parse(_).dyn.extract[User])
-    def userDms()(implicit s: BackPressureStrategy): Future[Seq[Channel]] = request(self, extraPath = "/channels")(Json.parse(_).dyn.extract[Seq[Channel]])
+    def currentUser()(implicit s: BackPressureStrategy): Future[User] = request(self)(Json.parse(_).as[User])
+    def user(id: Snowflake)(implicit s: BackPressureStrategy) = request(id.snowflakeString)(Json.parse(_).as[User])
+    def userDms()(implicit s: BackPressureStrategy): Future[Seq[Channel]] = request(self, extraPath = "/channels")(Json.parse(_).as[Seq[Channel]])
     def createDm(recipientId: Snowflake)(implicit s: BackPressureStrategy): Future[Channel] = 
-      request(self, extraPath = "/channels", method = "POST", body = Json.obj("recipient_id" -> recipientId.snowflakeString))(Json.parse(_).dyn.extract[Channel])
+      request(self, extraPath = "/channels", method = "POST", body = Json.obj("recipient_id" -> recipientId.snowflakeString))(Json.parse(_).as[Channel])
   }
   
   private[this] val rateLimitRegistry = new RateLimitRegistry()

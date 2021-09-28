@@ -1,8 +1,10 @@
 package headache
 
+import ai.x.play.{json => jsonx}
+import ai.x.play.json.implicits.optionWithNull
 import enumeratum.values.{IntEnum, IntEnumEntry, StringEnumEntry, StringEnum}
-import play.api.libs.json._
 import java.time.Instant
+import play.api.libs.json._
 import play.api.libs.functional.syntax._
 
 object JsonCodecs {
@@ -13,20 +15,33 @@ object JsonCodecs {
     case other => JsonNaming.SnakeCase(other)
   }
   implicit val jsonConf = JsonConfiguration[Json.WithDefaultValues](NamingMapping)
+  implicit val encoder = new jsonx.BaseNameEncoder() {
+    override def encode(s: String) = NamingMapping(s)
+  }
   
-  implicit object BooleanReads extends Reads[Boolean] {
+  implicit object BooleanReads extends Format[Boolean] {
     override def reads(jv: JsValue) = jv match {
       case JsNull => JsSuccess(false)
       case JsBoolean(b) => JsSuccess(b)
       case _ => JsError(Seq(JsPath -> Seq(JsonValidationError("error.expected.jsboolean"))))
     }
+    override def writes(b: Boolean) = JsBoolean(b)
   }
-  implicit object SnowflakeReads extends Reads[Snowflake] {
+  implicit object SnowflakeReads extends Format[Snowflake] {
     override def reads(jv: JsValue) = jv match {
       case JsString(s) => JsSuccess(Snowflake(s))
       case JsNumber(l) if l.isValidLong => JsSuccess(Snowflake(l.toLong))
       case other => JsError(JsonValidationError("error.expected.snowflake"))
     }
+    override def writes(s: Snowflake) = JsString(s.snowflakeString)
+  }
+  implicit object PermissionBitsFormat extends Format[PermissionBits] {
+    override def reads(jv: JsValue) = jv match {
+      case JsString(s) => JsSuccess(PermissionBits(s))
+      case JsNumber(l) if l.isValidLong => JsSuccess(PermissionBits(l.toLong))
+      case other => JsError(JsonValidationError("error.expected.permissionBits"))
+    }
+    override def writes(s: PermissionBits) = JsString(s.asPermissionsString)
   }
 //  implicit def seqReads[T: Reads]: Reads[Seq[T]] = new Reads[Seq[T]] {
 //    val inner = Reads.seq[T]
@@ -76,11 +91,15 @@ object JsonCodecs {
   //cached formats
   implicit val userFormat: Format[User] = Json.format
   implicit val guildMemberFormat: Format[GuildMember] = Json.format
-  implicit val gameStatusTimestampsFormat: Format[GameStatus.Timestamps] = Json.format
-  implicit val gameStatusAssetsFormat: Format[GameStatus.Assets] = Json.format
-  implicit val gameStatusTypeFormat: Format[GameStatus.Type] = intEnumFormat(GameStatus.Type.Unk)
-  implicit val gameStatusFormat: Format[GameStatus] = Json.format
-  implicit val guildUserFormat: Format[PresenceUser] = Json.format
+  implicit val activityTimestampsFormat: Format[Activity.Timestamps] = Json.format
+  implicit val activityAssetsFormat: Format[Activity.Assets] = Json.format
+  implicit val activityTypeFormat: Format[Activity.Type] = intEnumFormat(Activity.Type.Unk)
+  implicit val activityPartyFormat: Format[Activity.Party] = Json.format
+  implicit val activityEmojiFormat: Format[Activity.Emoji] = Json.format
+  implicit val activitySecretsFormat: Format[Activity.Secrets] = Json.format
+  implicit val activityFormat: Format[Activity] = Json.format
+  // implicit val guildUserFormat: Format[PresenceUser] = Json.format
+  implicit val clientStatusFormat: Format[ClientStatus] = Json.format
   implicit val guildPresenceFormat: Format[GuildPresence] = Json.format
   implicit val roleFormat: Format[Role] = Json.format
   implicit val emojiFormat: Format[Emoji] = Json.format
@@ -95,12 +114,18 @@ object JsonCodecs {
   implicit val attachmentFormat: Format[Attachment] = Json.format
   implicit val banFormat: Format[Ban] = Json.format
   implicit val embedFormat: Format[Embed] = Json.format
-  implicit val messageFormat: Format[Message] = Json.format
-  implicit val messageUpdateFormat: Format[MessageUpdate] = Json.format
+  implicit val reactionFormat: Format[Reaction] = Json.format
+  implicit val messageTypeFormat: Format[Message.Type] = intEnumFormat(Message.Type.Unk)
+  implicit val messageActivityTypeFormat: Format[Message.Activity.Type] = intEnumFormat(Message.Activity.Type.Unk)
+  implicit val messageActivityFormat: Format[Message.Activity] = Json.format
+  implicit val messageApplicationFormat: Format[Message.Application] = Json.format
+  implicit val messageReferenceFormat: Format[Message.Reference] = Json.format
+  implicit val messageFormat: Format[Message] = jsonx.Jsonx.formatCaseClassUseDefaults
+  // implicit val messageUpdateFormat: Format[MessageUpdate] = Json.format
   implicit val notificationLevelFormat = intEnumFormat[NotificationLevel](NotificationLevel.Unk)
   implicit val explicitContentFilterFormat = intEnumFormat[ExplicitContentFilterLevel](ExplicitContentFilterLevel.Unk)
   implicit val guildFormat: Format[Guild] = Json.format
-  implicit val permissionOverwriteType: Format[PermissionOverwrite.Type] = stringEnumFormat[PermissionOverwrite.Type](PermissionOverwrite.Type.Unk)
+  implicit val permissionOverwriteType: Format[PermissionOverwrite.Type] = intEnumFormat[PermissionOverwrite.Type](PermissionOverwrite.Type.Unk)
   implicit val overwriteFormat: Format[PermissionOverwrite] = Json.format
   implicit val channelTypeFormat: Format[Channel.Type] = intEnumFormat[Channel.Type](Channel.Type.Unk)
   implicit val channelStateFormat: Format[Channel] = Json.format
@@ -108,67 +133,7 @@ object JsonCodecs {
   
   //cached gateway events
   implicit val readStateFormat: Format[GatewayEvents.ReadState] = Json.format
-  implicit val gatewayEventGuildFormat: Format[GatewayEvents.Guild] = new Format[GatewayEvents.Guild] {
-    val id = (__ \ "id").format[Snowflake]
-    val name = (__ \ "name").format[String]
-    val icon = (__ \ "icon").formatNullable[String]
-    val splash = (__ \ "splash").formatNullable[String]
-    val ownerId = (__ \ "owner_id").format[Snowflake]
-    val region = (__ \ "region").format[String]
-    val afkChannelId = (__ \ "afk_channel_id").formatNullable[Snowflake]
-    val afkTimeout = (__ \ "afk_timeout").format[Int]
-    val embedEnabled = (__ \ "embed_enabled").formatNullable[Boolean]
-    val embedChannelId = (__ \ "embed_channel_id").formatNullable[Snowflake]
-    val verificationLevel = (__ \ "verification_level").format[Int]
-    val defaultMessageNotifications = (__ \ "default_message_notifications").format[NotificationLevel]
-    val explicitContentFilter = (__ \ "explicit_content_filter").format[ExplicitContentFilterLevel]
-    val roles = (__ \ "roles").formatWithDefault[Array[Role]](Array.empty)
-    val emojis = (__ \ "emojis").formatWithDefault[Array[Emoji]](Array.empty)
-    val features = (__ \ "features").formatWithDefault[Array[String]](Array.empty)
-    val mfaLevel = (__ \ "mfa_level").format[Int]
-    val applicationId = (__ \ "application_id").formatNullable[Snowflake]
-    val widgetEnabled = (__ \ "widget_enabled").formatNullable[Boolean]
-    val widgetChannelId = (__ \ "widget_channel_id").formatNullable[Snowflake]
-    val joinedAt = (__ \ "joined_at").formatNullable[Instant]
-    val large = (__ \ "large").formatWithDefault[Boolean](false)
-    val unavailable = (__ \ "unavailable").formatWithDefault[Boolean](false)
-    val memberCount = (__ \ "member_count").format[Int]
-    val members = (__ \ "members").formatWithDefault[Array[GuildMember]](Array.empty)
-    val voiceStates = (__ \ "voice_states").formatWithDefault[Array[VoiceState]](Array.empty)
-    val channels = (__ \ "channels").formatWithDefault[Array[Channel]](Array.empty)
-    val presences = (__ \ "presences").formatWithDefault[Array[GuildPresence]](Array.empty)
-    override def reads(js: JsValue) = for {
-      id <- id.reads(js)
-      name <- name.reads(js)
-      icon <- icon.reads(js)
-      splash <- splash.reads(js)
-      ownerId <- ownerId.reads(js)
-      region <- region.reads(js)
-      afkChannelId <- afkChannelId.reads(js)
-      afkTimeout <- afkTimeout.reads(js)
-      embedEnabled <- embedEnabled.reads(js)
-      embedChannelId <- embedChannelId.reads(js)
-      verificationLevel <- verificationLevel.reads(js)
-      defaultMessageNotifications <- defaultMessageNotifications.reads(js)
-      explicitContentFilter <- explicitContentFilter.reads(js)
-      roles <- roles.reads(js)
-      emojis <- emojis.reads(js)
-      features <- features.reads(js)
-      mfaLevel <- mfaLevel.reads(js)
-      applicationId <- applicationId.reads(js)
-      widgetEnabled <- widgetEnabled.reads(js)
-      widgetChannelId <- widgetChannelId.reads(js)
-      joinedAt <- joinedAt.reads(js)
-      large <- large.reads(js)
-      unavailable <- unavailable.reads(js)
-      memberCount <- memberCount.reads(js)
-      members <- members.reads(js)
-      voiceStates <- voiceStates.reads(js)
-      channels <- channels.reads(js)
-      presences <- presences.reads(js)
-    } yield GatewayEvents.Guild(id, name, icon, splash, ownerId, region, afkChannelId, afkTimeout, embedEnabled, embedChannelId, verificationLevel, defaultMessageNotifications, explicitContentFilter, roles, emojis, features, mfaLevel, applicationId, widgetEnabled, widgetChannelId, joinedAt, large, unavailable, memberCount, members, voiceStates, channels, presences)
-    override def writes(g: GatewayEvents.Guild) = id.writes(g.id) ++ name.writes(g.name) ++ icon.writes(g.icon) ++ splash.writes(g.splash) ++ ownerId.writes(g.ownerId) ++ region.writes(g.region) ++ afkChannelId.writes(g.afkChannelId) ++ afkTimeout.writes(g.afkTimeout) ++ embedEnabled.writes(g.embedEnabled) ++ embedChannelId.writes(g.embedChannelId) ++ verificationLevel.writes(g.verificationLevel) ++ defaultMessageNotifications.writes(g.defaultMessageNotifications) ++ explicitContentFilter.writes(g.explicitContentFilter) ++ roles.writes(g.roles) ++ emojis.writes(g.emojis) ++ features.writes(g.features) ++ mfaLevel.writes(g.mfaLevel) ++ applicationId.writes(g.applicationId) ++ widgetEnabled.writes(g.widgetEnabled) ++ widgetChannelId.writes(g.widgetChannelId) ++ joinedAt.writes(g.joinedAt) ++ large.writes(g.large) ++ unavailable.writes(g.unavailable) ++ memberCount.writes(g.memberCount) ++ members.writes(g.members) ++ voiceStates.writes(g.voiceStates) ++ channels.writes(g.channels) ++ presences.writes(g.presences)
-  }
+  implicit val gatewayEventGuildFormat: Format[GatewayEvents.Guild] = jsonx.Jsonx.formatCaseClassUseDefaults
   implicit val readyGuildFormat: Format[UnavailableGuild Either GatewayEvents.Guild] = eitherFormat
   implicit val readyFormat: Format[GatewayEvents.Ready] = (
     (__ \ "v").format[Int] and
